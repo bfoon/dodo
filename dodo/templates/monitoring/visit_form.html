@@ -1,0 +1,231 @@
+{% extends 'base.html' %}
+{% block title %}Log Field Visit — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'monitoring:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Monitoring</a></li>
+<li class="breadcrumb-item"><a href="{% url 'monitoring:visits' %}" style="color:var(--dodo-blue);text-decoration:none;">Visits</a></li>
+<li class="breadcrumb-item active">New</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-section { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.25rem 1.5rem; margin-bottom:1rem; }
+.form-section-title { font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--dodo-blue); margin-bottom:1rem; display:flex; align-items:center; gap:.5rem; }
+.form-section-title .num { width:22px; height:22px; border-radius:50%; background:var(--dodo-blue); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:0.72rem; }
+.field-label { font-size:0.78rem; font-weight:600; color:#374151; margin-bottom:.3rem; }
+.field-label .req { color:#dc2626; }
+.field-hint { font-size:0.72rem; color:#94a3b8; margin-top:.2rem; }
+.form-control, .form-select { font-size:0.87rem; border-radius:8px; border-color:#e2e8f0; }
+.form-control:focus, .form-select:focus { border-color:var(--dodo-blue); box-shadow:0 0 0 3px rgba(0,119,200,0.12); }
+textarea.form-control { min-height:90px; }
+
+.type-option { cursor:pointer; padding:.8rem .9rem; border:1.5px solid #e2e8f0; border-radius:10px; background:#fff; transition:all .12s; display:flex; gap:.7rem; align-items:center; }
+.type-option input { display:none; }
+.type-option:hover { border-color:#cbd5e1; }
+.type-option.selected { border-color:var(--dodo-blue); background:rgba(0,119,200,0.06); }
+.type-option .ico { width:36px; height:36px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+.type-option .text { flex-grow:1; }
+.type-option .text .name { font-weight:600; font-size:0.86rem; color:#0f172a; }
+.type-option .text .desc { font-size:0.72rem; color:#64748b; margin-top:.1rem; }
+
+.sticky-actions { position:sticky; bottom:0; background:#fff; border-top:1px solid #e2e8f0; padding:.75rem 1rem; margin:0 -15px; z-index:10; border-radius:0 0 12px 12px; box-shadow:0 -4px 12px rgba(0,0,0,0.04); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-plus-square me-2" style="color:var(--dodo-blue);"></i>Log Field Visit</h1>
+    <p class="page-header-sub">Record a new monitoring visit with findings and recommendations</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'monitoring:visits' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">
+      <i class="bi bi-x-lg me-1"></i>Cancel
+    </a>
+  </div>
+</div>
+
+{% if messages %}
+  {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show" style="border-radius:10px;font-size:0.85rem;">
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<form method="post" id="visitForm" enctype="multipart/form-data" action="{% url 'monitoring:create_visit' %}">
+  {% csrf_token %}
+
+  <div class="row">
+    <div class="col-lg-8">
+      <!-- 1. Basic info -->
+      <div class="form-section">
+        <div class="form-section-title"><span class="num">1</span>Visit Details</div>
+
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="field-label">Project <span class="req">*</span></label>
+            <select name="project" class="form-select" required>
+              <option value="">— Select a project —</option>
+              {% for p in projects %}
+                <option value="{{ p.pk }}">
+                  {% if p.pims_id %}[{{ p.pims_id }}] {% endif %}{{ p.display_title }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="field-label">Visit Date <span class="req">*</span></label>
+            <input type="date" name="visit_date" class="form-control" required value="{{ today|date:'Y-m-d' }}">
+          </div>
+
+          <div class="col-12">
+            <label class="field-label">Visit Type <span class="req">*</span></label>
+            <div class="row g-2 mt-1">
+              {% for vt, vl in visit_types %}
+              <div class="col-md-6">
+                <label class="type-option d-flex">
+                  <input type="radio" name="visit_type" value="{{ vt }}" required>
+                  <div class="ico"
+                       style="background:{% if vt == 'field' %}rgba(245,158,11,0.15);color:#f59e0b{% elif vt == 'remote' %}rgba(14,165,233,0.15);color:#0ea5e9{% elif vt == 'desk' %}rgba(100,116,139,0.15);color:#64748b{% else %}rgba(124,58,237,0.15);color:#7c3aed{% endif %};">
+                    {% if vt == 'field' %}<i class="bi bi-geo-alt"></i>
+                    {% elif vt == 'remote' %}<i class="bi bi-camera-video"></i>
+                    {% elif vt == 'desk' %}<i class="bi bi-file-earmark-text"></i>
+                    {% else %}<i class="bi bi-people"></i>{% endif %}
+                  </div>
+                  <div class="text">
+                    <div class="name">{{ vl }}</div>
+                    <div class="desc">
+                      {% if vt == 'field' %}On-site visit to project location
+                      {% elif vt == 'remote' %}Video calls, phone, online supervision
+                      {% elif vt == 'desk' %}Review of documents and reports
+                      {% else %}Multi-agency or partner monitoring{% endif %}
+                    </div>
+                  </div>
+                </label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <label class="field-label">Location</label>
+            <input type="text" name="location" class="form-control" placeholder="City, region, community…">
+            <div class="field-hint">Where the visit took place (for field visits)</div>
+          </div>
+          <div class="col-md-6">
+            <label class="field-label">Attachment</label>
+            <input type="file" name="attachments" class="form-control">
+            <div class="field-hint">Report, photos, meeting minutes (optional)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Purpose & findings -->
+      <div class="form-section">
+        <div class="form-section-title"><span class="num">2</span>Purpose & Findings</div>
+
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="field-label">Purpose of Visit <span class="req">*</span></label>
+            <textarea name="purpose" class="form-control" required rows="2"
+                      placeholder="Why was this visit conducted? What were the objectives?"></textarea>
+          </div>
+
+          <div class="col-12">
+            <label class="field-label">Key Findings</label>
+            <textarea name="findings" class="form-control" rows="4"
+                      placeholder="What did you observe? Progress, issues, risks, successes…"></textarea>
+            <div class="field-hint">Describe what was seen, heard, and learned during the visit</div>
+          </div>
+
+          <div class="col-12">
+            <label class="field-label">Recommendations</label>
+            <textarea name="recommendations" class="form-control" rows="3"
+                      placeholder="What should happen next based on your findings?"></textarea>
+          </div>
+
+          <div class="col-12">
+            <label class="field-label">Follow-up Actions</label>
+            <textarea name="follow_up_actions" class="form-control" rows="2"
+                      placeholder="Specific action items — who will do what, by when?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Participants -->
+      <div class="form-section">
+        <div class="form-section-title"><span class="num">3</span>Conducted By</div>
+
+        {% if users %}
+        <div class="row g-2">
+          {% for u in users %}
+          <div class="col-md-6">
+            <label class="form-check" style="font-size:0.85rem;display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;">
+              <input type="checkbox" name="conducted_by" value="{{ u.pk }}"
+                     {% if u.pk == request.user.pk %}checked{% endif %}
+                     style="margin:0;">
+              <span>
+                <span style="font-weight:500;color:#0f172a;">{{ u.get_full_name|default:u.email }}</span>
+                {% if u.pk == request.user.pk %}
+                  <span class="badge bg-light text-dark" style="font-size:0.66rem;margin-left:.25rem;">You</span>
+                {% endif %}
+              </span>
+            </label>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p style="font-size:0.82rem;color:#64748b;margin-bottom:0;">
+          <i class="bi bi-info-circle me-1"></i>
+          You'll automatically be recorded as the person who conducted this visit.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="form-section" style="position:sticky;top:1rem;">
+        <div class="form-section-title"><i class="bi bi-info-circle" style="color:var(--dodo-blue);"></i>Tips</div>
+        <ul style="font-size:0.82rem;color:#475569;padding-left:1.1rem;line-height:1.55;">
+          <li class="mb-2"><strong>Field Visit</strong> — physically went to the project site.</li>
+          <li class="mb-2"><strong>Remote Monitoring</strong> — structured supervision over video or phone.</li>
+          <li class="mb-2"><strong>Desk Review</strong> — read reports and documents without visiting.</li>
+          <li class="mb-2"><strong>Joint Monitoring</strong> — multi-agency or partner-led mission.</li>
+          <li class="mb-2">Be concrete in <strong>Findings</strong> — what you saw, numbers, quotes.</li>
+          <li>Make <strong>Follow-ups</strong> actionable — who does what, by when.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="sticky-actions d-flex justify-content-between align-items-center gap-2">
+    <div style="font-size:0.78rem;color:#94a3b8;">
+      <i class="bi bi-shield-check me-1"></i>
+      Fields marked <span class="req" style="color:#dc2626;">*</span> are required
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'monitoring:visits' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">Cancel</a>
+      <button type="submit" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;padding:.4rem 1.2rem;">
+        <i class="bi bi-check-lg me-1"></i>Save Visit
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Type card selection
+document.querySelectorAll('.type-option').forEach(label => {
+  label.addEventListener('click', function() {
+    document.querySelectorAll('.type-option').forEach(l => l.classList.remove('selected'));
+    this.classList.add('selected');
+    const radio = this.querySelector('input');
+    if (radio) radio.checked = true;
+  });
+});
+</script>
+{% endblock %}

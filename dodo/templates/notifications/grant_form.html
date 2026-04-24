@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% block title %}Grant Access  — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'notifications:grants' %}" style="color:var(--dodo-blue);text-decoration:none;">Grants</a></li>
+<li class="breadcrumb-item active">New</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-key me-2" style="color:var(--dodo-blue);"></i>Grant Data Access</h1>
+    <p class="page-header-sub">Give a user access to specific projects, reports, or entire categories of data</p>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-8">
+    <form method="post" action="{% url 'notifications:grant' %}">
+      {% csrf_token %}
+      <div class="card">
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Grant Access To User <span class="text-danger">*</span></label>
+              <select name="granted_to" class="form-select" required style="border-radius:8px;">
+                <option value="">Select a user...</option>
+                {% for u in users %}
+                <option value="{{ u.pk }}">{{ u.get_full_name }} ({{ u.email }}){% if u.position %} — {{ u.position }}{% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Resource Type <span class="text-danger">*</span></label>
+              <select name="resource_type" id="resource_type" class="form-select" required style="border-radius:8px;" onchange="updateResourceOptions()">
+                <option value="">Choose what to grant access to...</option>
+                {% for value, label in resource_types %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Access Level <span class="text-danger">*</span></label>
+              <select name="access_level" class="form-select" required style="border-radius:8px;">
+                {% for value, label in access_levels %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-12" id="resource_picker_wrap">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Specific Resource</label>
+              <select name="resource_id" id="resource_id" class="form-select" style="border-radius:8px;">
+                <option value="">Select resource type first...</option>
+              </select>
+              <small class="text-muted" style="font-size:0.72rem;" id="resource_help">Pick the specific item to grant access to</small>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Start Date</label>
+              <input type="date" name="start_date" class="form-control" value="{{ today|date:'Y-m-d' }}" style="border-radius:8px;">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">End Date <small class="text-muted">(optional)</small></label>
+              <input type="date" name="end_date" class="form-control" style="border-radius:8px;">
+            </div>
+
+            <div class="col-12">
+              <div class="form-check">
+                <input type="checkbox" name="can_delegate" id="can_delegate" class="form-check-input">
+                <label for="can_delegate" class="form-check-label" style="font-size:0.85rem;">
+                  Allow this user to delegate their access to others
+                </label>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Reason / Justification</label>
+              <textarea name="reason" class="form-control" rows="3"
+                        placeholder="Why is this access being granted? (for audit trail)"
+                        style="border-radius:8px;"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer d-flex gap-2 justify-content-end">
+          <a href="{% url 'notifications:grants' %}" class="btn btn-outline-secondary" style="border-radius:8px;">Cancel</a>
+          <button type="submit" class="btn" style="background:var(--dodo-blue);color:#fff;border-radius:8px;">
+            <i class="bi bi-check-lg me-1"></i>Grant Access & Notify
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-body">
+        <h6 style="font-weight:600;"><i class="bi bi-shield-check me-2" style="color:var(--dodo-blue);"></i>Access Levels Explained</h6>
+        <div style="font-size:0.8rem;color:#475569;">
+          <div class="mb-2"><strong>View Only:</strong> Read-only access</div>
+          <div class="mb-2"><strong>View & Edit:</strong> Can update data</div>
+          <div class="mb-2"><strong>View & Download:</strong> Can export/download data</div>
+          <div class="mb-2"><strong>View, Edit & Delete:</strong> Full data management</div>
+          <div class="mb-2"><strong>View, Edit & Approve:</strong> Can approve reports</div>
+          <div class="mb-2"><strong>Full Access:</strong> Admin-level control over this resource</div>
+        </div>
+        <hr>
+        <div class="alert alert-warning" style="font-size:0.78rem;margin:0;">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          All grants are logged in the audit trail. The user will be notified via email and in-app.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const projectOptions = {{ projects|length }};
+const unitOptions = {{ units|length }};
+const cycleOptions = {{ cycles|length }};
+
+const resourceData = {
+  project: [
+    {% for p in projects %}{pk: {{ p.pk }}, label: "{{ p.pims_id|default_if_none:'' }} {{ p.display_title|escapejs }}"},{% endfor %}
+  ],
+  programme_unit: [
+    {% for u in units %}{pk: {{ u.pk }}, label: "{{ u.name|escapejs }}"},{% endfor %}
+  ],
+  reporting_cycle: [
+    {% for c in cycles %}{pk: {{ c.pk }}, label: "{{ c.year }} {{ c.quarter }} — {{ c.get_cycle_type_display|escapejs }}"},{% endfor %}
+  ],
+  survey: [],
+  indicator: [],
+  all_projects: null,
+  all_reports: null,
+};
+
+function updateResourceOptions() {
+  const type = document.getElementById('resource_type').value;
+  const picker = document.getElementById('resource_id');
+  const wrap = document.getElementById('resource_picker_wrap');
+  const help = document.getElementById('resource_help');
+
+  picker.innerHTML = '';
+
+  if (type === 'all_projects' || type === 'all_reports') {
+    wrap.style.display = 'none';
+    picker.removeAttribute('required');
+    return;
+  }
+
+  wrap.style.display = 'block';
+
+  if (type && resourceData[type]) {
+    const opt = document.createElement('option');
+    opt.value = ''; opt.textContent = 'Select specific ' + type + '...';
+    picker.appendChild(opt);
+    resourceData[type].forEach(item => {
+      const o = document.createElement('option');
+      o.value = item.pk; o.textContent = item.label;
+      picker.appendChild(o);
+    });
+    picker.setAttribute('required', 'required');
+    help.textContent = `Pick the specific ${type.replace('_', ' ')} to grant access to`;
+  } else {
+    const opt = document.createElement('option');
+    opt.value = ''; opt.textContent = 'Select resource type first...';
+    picker.appendChild(opt);
+  }
+}
+</script>
+{% endblock %}

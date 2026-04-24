@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% block title %}Deadlines  — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item active">Deadlines</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-alarm me-2" style="color:var(--dodo-blue);"></i>Reporting Deadlines</h1>
+    <p class="page-header-sub">Track submission deadlines and stage progress for all reporting cycles</p>
+  </div>
+</div>
+
+<!-- Summary strip -->
+{% with overdue_count=deadlines|dictsort:"status"|length %}
+<div class="row g-2 mb-3">
+  <div class="col-md-3">
+    <div class="card" style="border-left:4px solid #22c55e;">
+      <div class="card-body py-2">
+        <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;font-weight:600;">Completed</div>
+        <div style="font-size:1.4rem;font-weight:700;color:#166534;">{{ deadlines|length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card" style="border-left:4px solid #3b82f6;">
+      <div class="card-body py-2">
+        <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;font-weight:600;">Upcoming</div>
+        <div style="font-size:1.4rem;font-weight:700;color:#1e40af;">Tracked</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card" style="border-left:4px solid #f59e0b;">
+      <div class="card-body py-2">
+        <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;font-weight:600;">At Risk</div>
+        <div style="font-size:1.4rem;font-weight:700;color:#92400e;">Review</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card" style="border-left:4px solid #ef4444;">
+      <div class="card-body py-2">
+        <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;font-weight:600;">Overdue</div>
+        <div style="font-size:1.4rem;font-weight:700;color:#991b1b;">Action</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endwith %}
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead style="background:#f8fafc;">
+        <tr>
+          <th>Project</th>
+          <th>Cycle</th>
+          <th class="text-center">Current Stage</th>
+          <th>Final Submission Due</th>
+          <th class="text-center">Days Left</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in deadlines %}
+        <tr>
+          <td>
+            <a href="{% url 'projects:detail' d.project.pk %}" style="color:#1a202c;text-decoration:none;font-weight:500;font-size:0.85rem;">
+              {% if d.project.pims_id %}<span style="font-size:0.7rem;color:#94a3b8;">{{ d.project.pims_id }}</span><br>{% endif %}
+              {{ d.project.display_title }}
+            </a>
+            <div style="font-size:0.72rem;color:#64748b;">
+              <span style="width:8px;height:8px;background:{{ d.project.programme_unit.color }};border-radius:2px;display:inline-block;margin-right:3px;"></span>
+              {{ d.project.programme_unit.name }}
+            </div>
+          </td>
+          <td>
+            <span class="badge bg-light text-dark" style="font-size:0.72rem;">{{ d.cycle.year }} {{ d.cycle.quarter }}</span>
+            <div style="font-size:0.7rem;color:#94a3b8;">{{ d.cycle.get_cycle_type_display }}</div>
+          </td>
+          <td class="text-center" style="font-size:0.78rem;">
+            {% with stage=d.get_current_stage %}
+            <span style="font-weight:500;color:#475569;">{{ stage.1 }}</span>
+            {% endwith %}
+          </td>
+          <td style="font-size:0.83rem;">
+            <strong>{{ d.final_submission_deadline|date:"d M Y" }}</strong>
+          </td>
+          <td class="text-center">
+            {% with days=d.get_days_until_deadline %}
+            {% if days < 0 %}
+            <span class="badge" style="background:#fee2e2;color:#991b1b;font-weight:600;">{{ days|stringformat:"+d" }}d</span>
+            {% elif days <= 3 %}
+            <span class="badge" style="background:#fef3c7;color:#92400e;font-weight:600;">{{ days }}d</span>
+            {% elif days <= 14 %}
+            <span class="badge" style="background:#e0f2fe;color:#0369a1;font-weight:600;">{{ days }}d</span>
+            {% else %}
+            <span class="badge bg-light text-dark">{{ days }}d</span>
+            {% endif %}
+            {% endwith %}
+          </td>
+          <td>
+            {% if d.status == 'completed' %}<span class="badge badge-submitted">Completed</span>
+            {% elif d.status == 'overdue' %}<span class="badge badge-overdue">Overdue</span>
+            {% elif d.status == 'at_risk' %}<span class="badge badge-pending">At Risk</span>
+            {% elif d.status == 'in_progress' %}<span class="badge badge-under_review">In Progress</span>
+            {% elif d.status == 'waived' %}<span class="badge badge-not_applicable">Waived</span>
+            {% else %}<span class="badge badge-not_started">Upcoming</span>{% endif %}
+          </td>
+          <td>
+            <a href="{% url 'notifications:deadline_edit' d.pk %}" class="btn btn-sm btn-outline-secondary" style="border-radius:6px;font-size:0.72rem;">
+              <i class="bi bi-pencil"></i>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center py-5">
+          <i class="bi bi-calendar-check fs-2 d-block mb-2" style="color:#cbd5e1;"></i>
+          <div class="text-muted">No deadline schedules yet</div>
+          <small class="text-muted d-block mt-1">Create a deadline template and generate schedules for a reporting cycle.</small>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

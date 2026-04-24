@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+{% block title %}{{ indicator.description|truncatechars:40 }} — Data Entry — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'monitoring:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Monitoring</a></li>
+<li class="breadcrumb-item"><a href="{% url 'monitoring:indicators' %}" style="color:var(--dodo-blue);text-decoration:none;">Indicators</a></li>
+<li class="breadcrumb-item active">{{ indicator.code|default:"Data Entry" }}</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.context-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem 1.25rem; margin-bottom:1rem; }
+.context-card .outcome-chip { display:inline-flex; align-items:center; gap:.4rem; padding:.2rem .55rem; border-radius:5px; background:rgba(0,119,200,0.12); color:var(--dodo-blue); font-size:0.72rem; font-weight:600; }
+.context-card .desc { font-size:0.95rem; font-weight:500; color:#0f172a; line-height:1.4; margin-top:.5rem; }
+.meta-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:.75rem; margin-top:.75rem; padding-top:.75rem; border-top:1px solid #f1f5f9; font-size:0.8rem; }
+.meta-grid .lbl { font-size:0.68rem; text-transform:uppercase; letter-spacing:.03em; font-weight:600; color:#94a3b8; margin-bottom:.15rem; }
+.meta-grid .val { color:#0f172a; font-weight:500; }
+
+.entry-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.25rem 1.5rem; }
+.section-title { font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--dodo-blue); margin-bottom:1rem; display:flex; align-items:center; gap:.5rem; }
+.field-label { font-size:0.78rem; font-weight:600; color:#374151; margin-bottom:.3rem; }
+.field-label .req { color:#dc2626; }
+.form-control, .form-select { font-size:0.87rem; border-radius:8px; border-color:#e2e8f0; }
+.form-control:focus, .form-select:focus { border-color:var(--dodo-blue); box-shadow:0 0 0 3px rgba(0,119,200,0.12); }
+
+.quarter-chip { display:inline-flex; align-items:center; justify-content:center; padding:.45rem .9rem; border-radius:20px; border:1.5px solid #e2e8f0; font-size:0.82rem; font-weight:600; cursor:pointer; background:#fff; transition:all .12s; min-width:52px; }
+.quarter-chip input { display:none; }
+.quarter-chip:hover { border-color:#cbd5e1; }
+.quarter-chip.selected { border-color:var(--dodo-blue); background:rgba(0,119,200,0.08); color:var(--dodo-blue); }
+
+.history-table th { font-size:0.7rem; text-transform:uppercase; letter-spacing:.03em; color:#64748b; font-weight:600; background:#f8fafc; }
+.history-table td { font-size:0.84rem; vertical-align:middle; }
+.history-table .qlabel { font-size:0.75rem; font-weight:600; padding:.2rem .5rem; border-radius:4px; background:#f1f5f9; color:#475569; }
+.value-highlight { font-size:0.95rem; font-weight:600; color:#0f172a; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title">
+      <i class="bi bi-pencil-square me-2" style="color:var(--dodo-blue);"></i>
+      Indicator Data Entry
+    </h1>
+    <p class="page-header-sub">Record quarterly achievements against this indicator</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'monitoring:indicators' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">
+      <i class="bi bi-arrow-left me-1"></i>Back to Indicators
+    </a>
+  </div>
+</div>
+
+{% if messages %}
+  {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show" style="border-radius:10px;font-size:0.85rem;">
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<!-- Indicator context -->
+<div class="context-card">
+  <div class="d-flex gap-2 align-items-center flex-wrap">
+    <span class="outcome-chip">
+      <i class="bi bi-diagram-3"></i>
+      {{ indicator.outcome.code }} · {{ indicator.outcome.get_tier_display }}
+    </span>
+    {% if indicator.code %}
+      <span class="badge bg-light text-dark" style="font-size:0.72rem;">{{ indicator.code }}</span>
+    {% endif %}
+  </div>
+  <div class="desc">{{ indicator.description }}</div>
+
+  <div class="meta-grid">
+    {% if indicator.baseline %}
+    <div>
+      <div class="lbl">Baseline</div>
+      <div class="val">{{ indicator.baseline }}</div>
+    </div>
+    {% endif %}
+    {% if indicator.end_target %}
+    <div>
+      <div class="lbl">End Target</div>
+      <div class="val">{{ indicator.end_target }}</div>
+    </div>
+    {% endif %}
+    {% if indicator.frequency %}
+    <div>
+      <div class="lbl">Frequency</div>
+      <div class="val">{{ indicator.frequency }}</div>
+    </div>
+    {% endif %}
+    {% if indicator.cpd_data_source %}
+    <div>
+      <div class="lbl">Data Source</div>
+      <div class="val">{{ indicator.cpd_data_source }}</div>
+    </div>
+    {% endif %}
+    {% if indicator.responsible_institution %}
+    <div>
+      <div class="lbl">Responsible</div>
+      <div class="val">{{ indicator.responsible_institution }}</div>
+    </div>
+    {% endif %}
+    {% if indicator.means_of_verification %}
+    <div style="grid-column:1/-1;">
+      <div class="lbl">Means of Verification</div>
+      <div class="val">{{ indicator.means_of_verification }}</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Entry form -->
+  <div class="col-lg-5">
+    <div class="entry-card">
+      <div class="section-title"><i class="bi bi-plus-circle"></i>Record Achievement</div>
+
+      <form method="post" action="{% url 'monitoring:indicator_data' indicator.pk %}">
+        {% csrf_token %}
+
+        <div class="row g-3">
+          <div class="col-5">
+            <label class="field-label">Year <span class="req">*</span></label>
+            <select name="year" class="form-select" required>
+              {% for y in years %}
+                <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-7">
+            <label class="field-label">Quarter <span class="req">*</span></label>
+            <div class="d-flex gap-2 flex-wrap">
+              {% for q in quarters %}
+                <label class="quarter-chip {% if q == current_quarter %}selected{% endif %}">
+                  <input type="radio" name="quarter" value="{{ q }}" required
+                         {% if q == current_quarter %}checked{% endif %}>
+                  {{ q }}
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="col-12">
+            <label class="field-label">Achieved Value <span class="req">*</span></label>
+            <textarea name="value" class="form-control" rows="2" required
+                      placeholder="e.g. 1,250 households reached · 85% completion · Law passed"></textarea>
+            <div style="font-size:0.72rem;color:#94a3b8;margin-top:.25rem;">
+              Enter the quantitative or narrative value achieved this quarter.
+            </div>
+          </div>
+
+          <div class="col-12">
+            <label class="field-label">Notes</label>
+            <textarea name="notes" class="form-control" rows="3"
+                      placeholder="Methodology, data caveats, or context for this value"></textarea>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 mt-3 pt-3 border-top" style="border-color:#e2e8f0;">
+          <button type="submit" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;padding:.4rem 1.2rem;">
+            <i class="bi bi-check-lg me-1"></i>Save Achievement
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="col-lg-7">
+    <div class="entry-card p-0">
+      <div class="p-3 border-bottom" style="border-color:#f1f5f9;">
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="section-title mb-0"><i class="bi bi-clock-history"></i>Achievement History</div>
+          <span class="badge bg-light text-dark" style="font-size:0.72rem;">
+            {{ achievements|length }} record{{ achievements|length|pluralize }}
+          </span>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table history-table mb-0">
+          <thead>
+            <tr>
+              <th style="padding-left:1rem;">Period</th>
+              <th>Achieved Value</th>
+              <th>Recorded By</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in achievements %}
+            <tr>
+              <td style="padding-left:1rem;white-space:nowrap;">
+                <span class="qlabel">{{ a.year }} {{ a.quarter }}</span>
+              </td>
+              <td>
+                <div class="value-highlight">{{ a.achieved_value|default:"—" }}</div>
+                {% if a.notes %}
+                  <div style="font-size:0.74rem;color:#64748b;margin-top:.2rem;">
+                    <i class="bi bi-sticky me-1"></i>{{ a.notes|truncatechars:80 }}
+                  </div>
+                {% endif %}
+              </td>
+              <td style="font-size:0.78rem;color:#475569;">
+                {% if a.entered_by %}
+                  <i class="bi bi-person-circle me-1" style="color:#94a3b8;"></i>
+                  {{ a.entered_by.get_full_name|default:a.entered_by.email }}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td style="font-size:0.76rem;color:#94a3b8;white-space:nowrap;">
+                {{ a.updated_at|date:"d M Y" }}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="text-center py-4" style="color:#94a3b8;">
+                <i class="bi bi-clock-history d-block mb-2" style="font-size:1.5rem;color:#cbd5e1;"></i>
+                No achievements recorded yet. Use the form to record the first one.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Pill selection for quarter
+document.querySelectorAll('.quarter-chip').forEach(label => {
+  label.addEventListener('click', function() {
+    document.querySelectorAll('.quarter-chip').forEach(l => l.classList.remove('selected'));
+    this.classList.add('selected');
+  });
+});
+</script>
+{% endblock %}

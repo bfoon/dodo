@@ -1,0 +1,307 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard — Dodo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-grid-1x2-fill me-2" style="color:var(--dodo-blue);"></i>Dashboard</h1>
+    <p class="page-header-sub">
+      {% if co %}{{ co.name }} Country Office — {% endif %}
+      Overview of programme monitoring and evaluation activities
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'projects:tracker' %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;">
+      <i class="bi bi-table me-1"></i>Reporting Tracker
+    </a>
+  </div>
+</div>
+
+{% if co %}
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#0077c8,#005a9e);">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="stat-value">{{ total_projects|default:0 }}</div>
+          <div class="stat-label">Total Projects</div>
+        </div>
+        <i class="bi bi-folder2-open stat-icon"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#009e60,#007a4a);">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="stat-value">{{ active_projects|default:0 }}</div>
+          <div class="stat-label">Active Projects</div>
+        </div>
+        <i class="bi bi-activity stat-icon"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#f59e0b,#d97706);">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="stat-value">{{ cycle_submitted|default:0 }}</div>
+          <div class="stat-label">Reports Submitted</div>
+        </div>
+        <i class="bi bi-file-earmark-check stat-icon"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#00b5e2,#0077c8);">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="stat-value">{{ active_surveys|default:0 }}</div>
+          <div class="stat-label">Active Surveys</div>
+        </div>
+        <i class="bi bi-ui-checks-grid stat-icon"></i>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <!-- Programme Units Summary -->
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h6 class="mb-0" style="font-weight:600;">
+          <i class="bi bi-bar-chart-steps me-2" style="color:var(--dodo-blue);"></i>Progress by Programme Cluster
+        </h6>
+        <a href="{% url 'projects:tracker' %}" class="btn btn-sm btn-outline-primary" style="border-radius:6px;font-size:0.78rem;">View Tracker</a>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead style="background:#f8fafc;">
+              <tr>
+                <th>Cluster</th>
+                <th class="text-center">Projects</th>
+                <th class="text-center">Submitted</th>
+                <th class="text-center">Pending</th>
+                <th class="text-center">Overdue</th>
+                <th>Progress</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for unit in programme_units %}
+              <tr>
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    <div style="width:10px;height:10px;border-radius:3px;background:{{ unit.color }};flex-shrink:0;"></div>
+                    <a href="{% url 'dashboard:cluster' unit.pk %}" class="text-decoration-none fw-500" style="color:#1a202c;font-size:0.85rem;">{{ unit.name }}</a>
+                  </div>
+                </td>
+                <td class="text-center"><span class="badge bg-light text-dark">{{ unit.project_count }}</span></td>
+                <td class="text-center"><span class="badge badge-submitted">{{ unit.submitted }}</span></td>
+                <td class="text-center"><span class="badge badge-pending">{{ unit.pending }}</span></td>
+                <td class="text-center"><span class="badge badge-overdue">{{ unit.overdue }}</span></td>
+                <td style="min-width:120px;">
+                  {% if unit.project_count > 0 %}
+                    {% widthratio unit.submitted unit.project_count 100 as pct %}
+                    <div class="progress mt-1">
+                      <div class="progress-bar" style="width:{{ pct }}%;background:var(--dodo-green);"></div>
+                    </div>
+                    <div style="font-size:0.7rem;color:#64748b;margin-top:2px;">{{ pct }}% submitted</div>
+                  {% else %}
+                    <span style="color:#94a3b8;font-size:0.78rem;">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="6" class="text-center py-4 text-muted">No programme units configured</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Current Cycle Summary -->
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0" style="font-weight:600;">
+          <i class="bi bi-clipboard-data me-2" style="color:var(--dodo-blue);"></i>Current Reporting Cycle
+        </h6>
+      </div>
+      <div class="card-body">
+        {% if current_cycle %}
+          <div class="text-center mb-3">
+            <div style="font-size:1.8rem;font-weight:700;color:var(--dodo-blue);">{{ current_cycle.year }} {{ current_cycle.quarter }}</div>
+            <div style="font-size:0.8rem;color:#64748b;">{{ current_cycle.get_cycle_type_display }}</div>
+          </div>
+          <div class="row g-2 text-center">
+            <div class="col-6">
+              <div class="p-2 rounded" style="background:#f0fdf4;">
+                <div style="font-size:1.4rem;font-weight:700;color:#166534;">{{ cycle_submitted|default:0 }}</div>
+                <div style="font-size:0.72rem;color:#166534;">Submitted</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="p-2 rounded" style="background:#fffbeb;">
+                <div style="font-size:1.4rem;font-weight:700;color:#92400e;">{{ cycle_pending|default:0 }}</div>
+                <div style="font-size:0.72rem;color:#92400e;">Pending</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="p-2 rounded" style="background:#eff6ff;">
+                <div style="font-size:1.4rem;font-weight:700;color:#1e40af;">{{ cycle_under_review|default:0 }}</div>
+                <div style="font-size:0.72rem;color:#1e40af;">Under Review</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="p-2 rounded" style="background:#f8fafc;">
+                <div style="font-size:1.4rem;font-weight:700;color:#475569;">{{ cycle_not_started|default:0 }}</div>
+                <div style="font-size:0.72rem;color:#475569;">Not Started</div>
+              </div>
+            </div>
+          </div>
+          {% if current_cycle.final_report_due %}
+            <div class="mt-3 p-2 rounded" style="background:#fef2f2;border:1px solid #fecaca;">
+              <div style="font-size:0.75rem;color:#991b1b;font-weight:600;">
+                <i class="bi bi-calendar-x me-1"></i>Final Report Due
+              </div>
+              <div style="font-size:0.85rem;color:#991b1b;font-weight:700;">{{ current_cycle.final_report_due|date:"d M Y" }}</div>
+            </div>
+          {% endif %}
+        {% else %}
+          <div class="text-center py-3 text-muted">
+            <i class="bi bi-calendar3 fs-3 mb-2 d-block" style="opacity:0.3;"></i>
+            No active reporting cycle
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Actions + Recent Surveys -->
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0" style="font-weight:600;"><i class="bi bi-lightning-fill me-2" style="color:#f59e0b;"></i>Quick Actions</h6>
+      </div>
+      <div class="card-body p-0">
+        <a href="{% url 'projects:create' %}" class="d-flex align-items-center gap-3 p-3 border-bottom text-decoration-none" style="color:#1a202c;">
+          <div style="width:38px;height:38px;border-radius:10px;background:#eff6ff;display:flex;align-items:center;justify-content:center;">
+            <i class="bi bi-plus-circle" style="color:var(--dodo-blue);font-size:1.1rem;"></i>
+          </div>
+          <div>
+            <div style="font-size:0.85rem;font-weight:600;">Add New Project</div>
+            <div style="font-size:0.75rem;color:#64748b;">Register a project in the system</div>
+          </div>
+        </a>
+        <a href="{% url 'surveys:create' %}" class="d-flex align-items-center gap-3 p-3 border-bottom text-decoration-none" style="color:#1a202c;">
+          <div style="width:38px;height:38px;border-radius:10px;background:#f0fdf4;display:flex;align-items:center;justify-content:center;">
+            <i class="bi bi-ui-checks-grid" style="color:#166534;font-size:1.1rem;"></i>
+          </div>
+          <div>
+            <div style="font-size:0.85rem;font-weight:600;">Create Survey</div>
+            <div style="font-size:0.75rem;color:#64748b;">Design a quick data collection form</div>
+          </div>
+        </a>
+        <a href="{% url 'monitoring:create_visit' %}" class="d-flex align-items-center gap-3 p-3 border-bottom text-decoration-none" style="color:#1a202c;">
+          <div style="width:38px;height:38px;border-radius:10px;background:#fffbeb;display:flex;align-items:center;justify-content:center;">
+            <i class="bi bi-compass" style="color:#d97706;font-size:1.1rem;"></i>
+          </div>
+          <div>
+            <div style="font-size:0.85rem;font-weight:600;">Log Field Visit</div>
+            <div style="font-size:0.75rem;color:#64748b;">Record a monitoring visit</div>
+          </div>
+        </a>
+        <a href="{% url 'reporting:progress' %}" class="d-flex align-items-center gap-3 p-3 text-decoration-none" style="color:#1a202c;">
+          <div style="width:38px;height:38px;border-radius:10px;background:#fef2f2;display:flex;align-items:center;justify-content:center;">
+            <i class="bi bi-file-earmark-bar-graph" style="color:#991b1b;font-size:1.1rem;"></i>
+          </div>
+          <div>
+            <div style="font-size:0.85rem;font-weight:600;">View Reports</div>
+            <div style="font-size:0.75rem;color:#64748b;">Progress & verification reports</div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h6 class="mb-0" style="font-weight:600;"><i class="bi bi-ui-checks-grid me-2" style="color:var(--dodo-blue);"></i>Recent Surveys</h6>
+        <a href="{% url 'surveys:create' %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:6px;font-size:0.78rem;">
+          <i class="bi bi-plus me-1"></i>New Survey
+        </a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th>Survey</th>
+              <th>Type</th>
+              <th class="text-center">Responses</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for survey in recent_surveys %}
+              <tr>
+                <td>
+                  <a href="{% url 'surveys:detail' survey.pk %}" class="text-decoration-none fw-500" style="color:#1a202c;font-size:0.85rem;">{{ survey.title }}</a>
+                  {% if survey.project %}<div style="font-size:0.72rem;color:#64748b;">{{ survey.project.display_title }}</div>{% endif %}
+                </td>
+                <td><span class="badge bg-light text-dark" style="font-size:0.72rem;">{{ survey.get_survey_type_display }}</span></td>
+                <td class="text-center"><span style="font-weight:600;color:#374151;">{{ survey.get_response_count }}</span></td>
+                <td>
+                  {% if survey.status == 'active' %}
+                    <span class="badge badge-active">Active</span>
+                  {% elif survey.status == 'draft' %}
+                    <span class="badge badge-not_started">Draft</span>
+                  {% elif survey.status == 'closed' %}
+                    <span class="badge badge-closed">Closed</span>
+                  {% else %}
+                    <span class="badge bg-secondary">{{ survey.get_status_display }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <a href="{% url 'surveys:builder' survey.pk %}" class="btn btn-sm btn-outline-secondary" style="border-radius:6px;font-size:0.75rem;">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5" class="text-center py-4 text-muted">
+                  <i class="bi bi-ui-checks-grid fs-3 d-block mb-2" style="opacity:0.3;"></i>
+                  No surveys yet — <a href="{% url 'surveys:create' %}">create the first one</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="card text-center py-5">
+  <div class="card-body">
+    <i class="bi bi-geo-alt fs-1 mb-3 d-block" style="color:#94a3b8;"></i>
+    <h5>No Country Office Selected</h5>
+    <p class="text-muted">You haven't been assigned to a country office yet, or no country office is active.</p>
+    {% if user.is_global_admin or user.is_staff %}
+      <a href="/admin/" class="btn" style="background:var(--dodo-blue);color:#fff;border-radius:8px;">Configure Country Offices</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

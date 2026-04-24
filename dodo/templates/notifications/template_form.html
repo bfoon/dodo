@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% block title %}{% if template %}Edit{% else %}New{% endif %} Deadline Template{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'notifications:template_list' %}" style="color:var(--dodo-blue);text-decoration:none;">Deadline Templates</a></li>
+<li class="breadcrumb-item active">{% if template %}Edit{% else %}New{% endif %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title">
+      <i class="bi bi-clock-history me-2" style="color:var(--dodo-blue);"></i>
+      {% if template %}Edit Deadline Template{% else %}Create Deadline Template{% endif %}
+    </h1>
+    <p class="page-header-sub">Configure submission timelines and automatic reminders. Templates can be applied to any reporting cycle.</p>
+  </div>
+</div>
+
+<form method="post" action="{% if template %}{% url 'notifications:template_edit' template.pk %}{% else %}{% url 'notifications:template_create' %}{% endif %}">
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0" style="font-weight:600;">Template Details</h6>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Template Name <span class="text-danger">*</span></label>
+              <input type="text" name="name" class="form-control" required
+                     value="{{ template.name|default:'' }}" placeholder="e.g. Q1 Progress Reporting Schedule"
+                     style="border-radius:8px;">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Cycle Type</label>
+              <select name="cycle_type" class="form-select" style="border-radius:8px;">
+                <option value="progress" {% if template.cycle_type == 'progress' %}selected{% endif %}>Progress Reporting</option>
+                <option value="verification" {% if template.cycle_type == 'verification' %}selected{% endif %}>Output Verification</option>
+                <option value="donor" {% if template.cycle_type == 'donor' %}selected{% endif %}>Donor Reporting</option>
+                <option value="custom" {% if template.cycle_type == 'custom' %}selected{% endif %}>Custom</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Description</label>
+              <textarea name="description" class="form-control" rows="2" style="border-radius:8px;">{{ template.description|default:'' }}</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0" style="font-weight:600;"><i class="bi bi-calendar-range me-2" style="color:var(--dodo-blue);"></i>Submission Timeline</h6>
+          <small class="text-muted">Days before the final submission deadline for each stage</small>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6 col-lg-3">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Internal Draft</label>
+              <div class="input-group">
+                <input type="number" name="internal_draft_days_before" class="form-control" min="0"
+                       value="{{ template.internal_draft_days_before|default:14 }}" style="border-radius:8px 0 0 8px;">
+                <span class="input-group-text" style="font-size:0.82rem;">days before</span>
+              </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Programme Review</label>
+              <div class="input-group">
+                <input type="number" name="programme_review_days_before" class="form-control" min="0"
+                       value="{{ template.programme_review_days_before|default:10 }}" style="border-radius:8px 0 0 8px;">
+                <span class="input-group-text" style="font-size:0.82rem;">days before</span>
+              </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">PMSU Review</label>
+              <div class="input-group">
+                <input type="number" name="pmsu_review_days_before" class="form-control" min="0"
+                       value="{{ template.pmsu_review_days_before|default:6 }}" style="border-radius:8px 0 0 8px;">
+                <span class="input-group-text" style="font-size:0.82rem;">days before</span>
+              </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">DRR/RR Clearance</label>
+              <div class="input-group">
+                <input type="number" name="final_clearance_days_before" class="form-control" min="0"
+                       value="{{ template.final_clearance_days_before|default:2 }}" style="border-radius:8px 0 0 8px;">
+                <span class="input-group-text" style="font-size:0.82rem;">days before</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 p-3 rounded" style="background:#eff6ff;border:1px solid #bae6fd;">
+            <div style="font-size:0.78rem;color:#0369a1;font-weight:600;margin-bottom:8px;">
+              <i class="bi bi-info-circle me-1"></i>Timeline Preview (based on final submission date)
+            </div>
+            <div id="timelinePreview" style="font-size:0.82rem;color:#075985;">
+              <!-- Rendered by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0" style="font-weight:600;"><i class="bi bi-bell me-2" style="color:var(--dodo-blue);"></i>Reminder Schedule</h6>
+          <small class="text-muted">When to send reminder notifications to responsible users</small>
+        </div>
+        <div class="card-body">
+          <label class="form-label" style="font-size:0.82rem;font-weight:600;">Send reminders (days before final deadline)</label>
+          <input type="text" name="reminder_days_before" class="form-control"
+                 value="{{ template.reminder_days_before|default:'14,7,3,1' }}"
+                 placeholder="14,7,3,1" style="border-radius:8px;">
+          <small class="text-muted" style="font-size:0.75rem;">Comma-separated list of days. Example: "14,7,3,1" sends reminders at 14, 7, 3, and 1 day before the deadline.</small>
+
+          <div class="mt-3">
+            <label class="form-label" style="font-size:0.82rem;font-weight:600;">Escalate to Head of Unit if overdue by</label>
+            <div class="input-group" style="max-width:260px;">
+              <input type="number" name="escalation_days_after" class="form-control" min="0"
+                     value="{{ template.escalation_days_after|default:1 }}" style="border-radius:8px 0 0 8px;">
+              <span class="input-group-text" style="font-size:0.82rem;">day(s)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0" style="font-weight:600;"><i class="bi bi-megaphone me-2" style="color:var(--dodo-blue);"></i>Notification Channels</h6>
+        </div>
+        <div class="card-body">
+          <div class="form-check mb-2">
+            <input type="checkbox" name="send_in_app" id="send_in_app" class="form-check-input"
+                   {% if not template or template.send_in_app %}checked{% endif %}>
+            <label for="send_in_app" class="form-check-label" style="font-size:0.85rem;">
+              <i class="bi bi-app me-1"></i>In-app notifications
+            </label>
+          </div>
+          <div class="form-check mb-2">
+            <input type="checkbox" name="send_email" id="send_email" class="form-check-input"
+                   {% if not template or template.send_email %}checked{% endif %}>
+            <label for="send_email" class="form-check-label" style="font-size:0.85rem;">
+              <i class="bi bi-envelope me-1"></i>Email notifications
+            </label>
+          </div>
+          <hr>
+          <div style="font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:8px;">Recipients</div>
+          <div class="form-check mb-2">
+            <input type="checkbox" name="notify_responsible" id="notify_responsible" class="form-check-input"
+                   {% if not template or template.notify_responsible %}checked{% endif %}>
+            <label for="notify_responsible" class="form-check-label" style="font-size:0.85rem;">
+              Responsible users (Project Manager, M&E focal, etc.)
+            </label>
+          </div>
+          <div class="form-check mb-2">
+            <input type="checkbox" name="notify_head_of_unit" id="notify_head_of_unit" class="form-check-input"
+                   {% if not template or template.notify_head_of_unit %}checked{% endif %}>
+            <label for="notify_head_of_unit" class="form-check-label" style="font-size:0.85rem;">
+              Head of Unit (receives escalations)
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn w-100 mb-2" style="background:var(--dodo-blue);color:#fff;border-radius:8px;padding:0.6rem;font-weight:600;">
+        <i class="bi bi-check-lg me-1"></i>{% if template %}Save Changes{% else %}Create Template{% endif %}
+      </button>
+      <a href="{% url 'notifications:template_list' %}" class="btn btn-outline-secondary w-100" style="border-radius:8px;">Cancel</a>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updatePreview() {
+  const draft = parseInt(document.querySelector('[name=internal_draft_days_before]').value) || 0;
+  const prog = parseInt(document.querySelector('[name=programme_review_days_before]').value) || 0;
+  const pmsu = parseInt(document.querySelector('[name=pmsu_review_days_before]').value) || 0;
+  const clear = parseInt(document.querySelector('[name=final_clearance_days_before]').value) || 0;
+
+  const html = `
+    <div>📝 <strong>Internal Draft:</strong> ${draft} days before deadline</div>
+    <div>👥 <strong>Programme Review:</strong> ${prog} days before deadline</div>
+    <div>🔍 <strong>PMSU Review:</strong> ${pmsu} days before deadline</div>
+    <div>✅ <strong>DRR/RR Clearance:</strong> ${clear} days before deadline</div>
+    <div>🎯 <strong>Final Submission:</strong> Day 0 (deadline)</div>
+  `;
+  document.getElementById('timelinePreview').innerHTML = html;
+}
+document.querySelectorAll('[name$=_days_before]').forEach(el => el.addEventListener('input', updatePreview));
+updatePreview();
+</script>
+{% endblock %}

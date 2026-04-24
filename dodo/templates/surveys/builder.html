@@ -1,0 +1,235 @@
+{% extends 'base.html' %}
+{% block title %}Survey Builder — {{ survey.title }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'surveys:list' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Surveys</a></li>
+<li class="breadcrumb-item active">Builder</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.builder-layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.25rem; align-items: start; }
+.q-card { background: #fff; border: 2px solid #e2e8f0; border-radius: 12px; padding: 1rem; margin-bottom: 0.75rem; transition: all 0.15s; position: relative; }
+.q-card:hover { border-color: var(--dodo-blue); box-shadow: 0 2px 8px rgba(0,119,200,0.1); }
+.q-card .q-number { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--dodo-blue); letter-spacing: 0.05em; }
+.q-card .q-text { font-size: 0.9rem; font-weight: 600; color: #1a202c; margin-top: 0.25rem; }
+.q-card .q-desc { font-size: 0.78rem; color: #64748b; margin-top: 0.15rem; }
+.q-type-badge { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 20px; background: var(--dodo-blue-light); color: var(--dodo-blue); font-weight: 600; }
+.q-actions { position: absolute; top: 0.75rem; right: 0.75rem; display: flex; gap: 0.25rem; }
+.add-q-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; position: sticky; top: calc(var(--topbar-height) + 1rem); }
+.qtype-option { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.65rem; border: 1.5px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 0.78rem; transition: all 0.15s; }
+.qtype-option:hover, .qtype-option.active { border-color: var(--dodo-blue); background: var(--dodo-blue-light); color: var(--dodo-blue); }
+.qtype-option input[type=radio] { display: none; }
+.qtype-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+.survey-status-bar { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1rem; background: #f0f9ff; border-radius: 10px; border: 1px solid #bae6fd; margin-bottom: 1.25rem; }
+@media (max-width: 991px) { .builder-layout { grid-template-columns: 1fr; } .add-q-panel { position: static; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-ui-checks-grid me-2" style="color:var(--dodo-blue);"></i>Survey Builder</h1>
+    <p class="page-header-sub">{{ survey.title }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    {% if survey.status == 'active' %}
+    <a href="{% url 'surveys:respond' survey.pk %}" target="_blank" class="btn btn-sm btn-outline-success" style="border-radius:8px;">
+      <i class="bi bi-box-arrow-up-right me-1"></i>Preview
+    </a>
+    <a href="{% url 'surveys:results' survey.pk %}" class="btn btn-sm" style="background:var(--dodo-green);color:#fff;border-radius:8px;">
+      <i class="bi bi-bar-chart-line me-1"></i>Results
+    </a>
+    <form method="post" action="{% url 'surveys:builder' survey.pk %}" class="d-inline">
+      {% csrf_token %}<input type="hidden" name="action" value="close">
+      <button type="submit" class="btn btn-sm btn-outline-danger" style="border-radius:8px;">
+        <i class="bi bi-stop-circle me-1"></i>Close Survey
+      </button>
+    </form>
+    {% else %}
+    <form method="post" action="{% url 'surveys:builder' survey.pk %}" class="d-inline">
+      {% csrf_token %}<input type="hidden" name="action" value="publish">
+      <button type="submit" class="btn btn-sm" style="background:var(--dodo-green);color:#fff;border-radius:8px;">
+        <i class="bi bi-send-check me-1"></i>Publish Survey
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="survey-status-bar">
+  <div>
+    <span class="fw-600" style="font-weight:600;font-size:0.85rem;">Status:</span>
+    {% if survey.status == 'active' %}<span class="badge badge-active ms-1">Active / Published</span>
+    {% elif survey.status == 'draft' %}<span class="badge badge-not_started ms-1">Draft</span>
+    {% elif survey.status == 'closed' %}<span class="badge badge-closed ms-1">Closed</span>
+    {% else %}<span class="badge bg-secondary ms-1">{{ survey.get_status_display }}</span>{% endif %}
+  </div>
+  <div style="color:#0369a1;font-size:0.82rem;"><i class="bi bi-list-check me-1"></i><strong>{{ questions|length }}</strong> question{{ questions|length|pluralize }}</div>
+  <div style="color:#0369a1;font-size:0.82rem;"><i class="bi bi-people me-1"></i><strong>{{ survey.get_response_count }}</strong> response{{ survey.get_response_count|pluralize }}</div>
+  {% if survey.project %}<div style="color:#0369a1;font-size:0.82rem;"><i class="bi bi-folder me-1"></i>{{ survey.project.display_title }}</div>{% endif %}
+  {% if survey.status == 'active' %}
+  <div class="ms-auto">
+    <span style="font-size:0.78rem;color:#0369a1;">Share link:</span>
+    <code style="font-size:0.78rem;background:#dbeafe;padding:0.15rem 0.5rem;border-radius:5px;">{{ request.scheme }}://{{ request.get_host }}{% url 'surveys:respond' survey.pk %}</code>
+    <button onclick="navigator.clipboard.writeText('{{ request.scheme }}://{{ request.get_host }}{% url "surveys:respond" survey.pk %}')" class="btn btn-sm btn-link p-0 ms-1" style="font-size:0.78rem;color:#0369a1;">
+      <i class="bi bi-clipboard"></i>
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<div class="builder-layout">
+  <!-- Questions List -->
+  <div>
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h6 class="mb-0" style="font-weight:600;color:#374151;">
+        Questions <span class="badge" style="background:#e2e8f0;color:#64748b;">{{ questions|length }}</span>
+      </h6>
+    </div>
+
+    {% for q in questions %}
+    <div class="q-card">
+      <div class="d-flex gap-2">
+        <div style="flex:1;">
+          <div class="q-number">Question {{ q.order }}</div>
+          <div class="q-text">{{ q.text }}{% if q.is_required %}<span class="text-danger ms-1">*</span>{% endif %}</div>
+          {% if q.description %}<div class="q-desc">{{ q.description }}</div>{% endif %}
+          <div class="mt-2 d-flex gap-2 align-items-center flex-wrap">
+            <span class="q-type-badge">{{ q.get_question_type_display }}</span>
+            {% if q.is_required %}<span class="badge" style="background:#fee2e2;color:#991b1b;font-size:0.68rem;">Required</span>{% endif %}
+            {% if q.question_type in 'radio,checkbox,dropdown' %}
+            <span style="font-size:0.72rem;color:#64748b;">{{ q.choices.count }} options</span>
+            {% endif %}
+            {% if q.question_type in 'likert,rating' %}
+            <span style="font-size:0.72rem;color:#64748b;">Scale: {{ q.scale_min }}–{{ q.scale_max }}</span>
+            {% endif %}
+          </div>
+          {% if q.choices.exists %}
+          <div class="mt-2 d-flex flex-wrap gap-1">
+            {% for c in q.choices.all|slice:":5" %}
+            <span style="font-size:0.72rem;background:#f1f5f9;border-radius:5px;padding:0.1rem 0.4rem;color:#475569;">{{ c.text }}</span>
+            {% endfor %}
+            {% if q.choices.count > 5 %}<span style="font-size:0.72rem;color:#94a3b8;">+{{ q.choices.count|add:"-5" }} more</span>{% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="q-actions">
+        <form method="post" action="{% url 'surveys:delete_question' q.pk %}" onsubmit="return confirm('Delete this question?')">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm" style="color:#ef4444;border:1px solid #fecaca;border-radius:6px;padding:0.2rem 0.5rem;background:#fff;">
+            <i class="bi bi-trash3"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+    {% empty %}
+    <div class="text-center py-5" style="border:2px dashed #e2e8f0;border-radius:12px;color:#94a3b8;">
+      <i class="bi bi-plus-circle-dotted fs-2 d-block mb-2"></i>
+      <div style="font-size:0.85rem;">No questions yet — add your first question from the panel</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Add Question Panel -->
+  <div class="add-q-panel">
+    <h6 class="mb-3" style="font-weight:700;color:#1a202c;"><i class="bi bi-plus-circle me-2" style="color:var(--dodo-blue);"></i>Add Question</h6>
+    <form method="post" action="{% url 'surveys:add_question' survey.pk %}" id="addQuestionForm">
+      {% csrf_token %}
+
+      <div class="mb-3">
+        <label class="form-label" style="font-size:0.8rem;font-weight:600;">Question Type</label>
+        <div class="qtype-grid">
+          {% for value, label in question_types %}
+          {% if value != 'section_header' %}
+          <label class="qtype-option" id="qtype_{{ value }}">
+            <input type="radio" name="question_type" value="{{ value }}" {% if value == 'text' %}checked{% endif %} onchange="updateTypeUI('{{ value }}')">
+            <span>{{ label }}</span>
+          </label>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" style="font-size:0.8rem;font-weight:600;">Question Text <span class="text-danger">*</span></label>
+        <textarea name="text" class="form-control" rows="2" placeholder="Type your question here..." required style="border-radius:8px;font-size:0.85rem;resize:none;"></textarea>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" style="font-size:0.8rem;font-weight:600;">Help Text / Description</label>
+        <input type="text" name="description" class="form-control" placeholder="Optional hint for respondents" style="border-radius:8px;font-size:0.85rem;">
+      </div>
+
+      <!-- Choices (for radio/checkbox/dropdown) -->
+      <div id="choices-group" class="mb-3" style="display:none;">
+        <label class="form-label" style="font-size:0.8rem;font-weight:600;">Answer Choices <span style="color:#64748b;font-weight:400;">(one per line)</span></label>
+        <textarea name="choices" class="form-control" rows="5" placeholder="Option 1&#10;Option 2&#10;Option 3" style="border-radius:8px;font-size:0.82rem;"></textarea>
+      </div>
+
+      <!-- Scale (for likert/rating) -->
+      <div id="scale-group" class="mb-3" style="display:none;">
+        <label class="form-label" style="font-size:0.8rem;font-weight:600;">Scale Range</label>
+        <div class="row g-2">
+          <div class="col-6">
+            <input type="number" name="scale_min" value="1" class="form-control form-control-sm" placeholder="Min" style="border-radius:8px;">
+            <input type="text" name="scale_min_label" class="form-control form-control-sm mt-1" placeholder="Min label (e.g. Strongly Disagree)" style="border-radius:8px;font-size:0.78rem;">
+          </div>
+          <div class="col-6">
+            <input type="number" name="scale_max" value="5" class="form-control form-control-sm" placeholder="Max" style="border-radius:8px;">
+            <input type="text" name="scale_max_label" class="form-control form-control-sm mt-1" placeholder="Max label (e.g. Strongly Agree)" style="border-radius:8px;font-size:0.78rem;">
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-3 form-check">
+        <input type="checkbox" name="is_required" id="is_required" class="form-check-input">
+        <label for="is_required" class="form-check-label" style="font-size:0.82rem;">Required question</label>
+      </div>
+
+      <button type="submit" class="btn w-100" style="background:var(--dodo-blue);color:#fff;border-radius:8px;font-weight:600;font-size:0.85rem;">
+        <i class="bi bi-plus-lg me-1"></i>Add Question
+      </button>
+    </form>
+
+    <hr style="margin: 1.25rem 0;">
+    <div>
+      <div style="font-size:0.75rem;font-weight:600;color:#64748b;margin-bottom:0.5rem;">SURVEY SETTINGS</div>
+      <div style="font-size:0.78rem;color:#374151;">
+        <i class="bi bi-{% if survey.is_anonymous %}eye-slash{% else %}person{% endif %} me-1"></i>
+        {% if survey.is_anonymous %}Anonymous responses{% else %}Named responses{% endif %}
+      </div>
+      <div style="font-size:0.78rem;color:#374151;margin-top:0.25rem;">
+        <i class="bi bi-tag me-1"></i>{{ survey.get_survey_type_display }}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updateTypeUI(type) {
+  // Update active state
+  document.querySelectorAll('.qtype-option').forEach(el => el.classList.remove('active'));
+  const selected = document.getElementById('qtype_' + type);
+  if (selected) selected.classList.add('active');
+
+  // Show/hide conditional fields
+  const showChoices = ['radio', 'checkbox', 'dropdown'].includes(type);
+  const showScale = ['likert', 'rating'].includes(type);
+  document.getElementById('choices-group').style.display = showChoices ? 'block' : 'none';
+  document.getElementById('scale-group').style.display = showScale ? 'block' : 'none';
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', () => {
+  updateTypeUI('text');
+  document.querySelectorAll('input[name=question_type]').forEach(el => {
+    el.addEventListener('change', () => updateTypeUI(el.value));
+  });
+});
+</script>
+{% endblock %}

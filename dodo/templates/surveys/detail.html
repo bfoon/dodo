@@ -1,0 +1,290 @@
+{% extends 'base.html' %}
+{% block title %}{{ survey.title }} — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'surveys:list' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Surveys</a></li>
+<li class="breadcrumb-item active">{{ survey.title|truncatechars:40 }}</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.info-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; margin-bottom:1rem; }
+.info-card .head { padding:.85rem 1.1rem; border-bottom:1px solid #f1f5f9; font-weight:600; font-size:0.88rem; color:#0f172a; display:flex; align-items:center; gap:.5rem; }
+.info-card .body { padding:1rem 1.1rem; }
+
+.stat-block { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem; text-align:center; height:100%; }
+.stat-block .val { font-size:1.8rem; font-weight:700; color:#0f172a; line-height:1; }
+.stat-block .lbl { font-size:0.72rem; text-transform:uppercase; letter-spacing:.03em; color:#64748b; font-weight:600; margin-top:.35rem; }
+.stat-block .ico { width:36px; height:36px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; margin-bottom:.5rem; }
+
+.field-row { display:grid; grid-template-columns:140px 1fr; gap:1rem; padding:.5rem 0; font-size:0.85rem; border-bottom:1px solid #f1f5f9; }
+.field-row:last-child { border-bottom:none; }
+.field-row .lbl { color:#94a3b8; font-weight:600; text-transform:uppercase; font-size:0.72rem; letter-spacing:.03em; }
+.field-row .val { color:#0f172a; }
+
+.share-box { background:linear-gradient(135deg, rgba(0,119,200,0.08) 0%, rgba(0,119,200,0.02) 100%); border:1px solid #bae6fd; border-radius:12px; padding:1rem 1.1rem; }
+.share-url { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:.5rem .75rem; font-family:ui-monospace, monospace; font-size:0.78rem; color:#0369a1; overflow-x:auto; white-space:nowrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+      {% if survey.status == 'active' %}<span class="badge badge-active">Active</span>
+      {% elif survey.status == 'draft' %}<span class="badge badge-not_started">Draft</span>
+      {% elif survey.status == 'closed' %}<span class="badge badge-closed">Closed</span>
+      {% elif survey.status == 'paused' %}<span class="badge bg-warning text-dark">Paused</span>
+      {% else %}<span class="badge bg-secondary">{{ survey.get_status_display }}</span>{% endif %}
+      <span class="badge bg-light text-dark" style="font-size:0.72rem;">{{ survey.get_survey_type_display }}</span>
+      {% if survey.is_anonymous %}
+        <span class="badge bg-light text-dark" style="font-size:0.72rem;"><i class="bi bi-eye-slash me-1"></i>Anonymous</span>
+      {% endif %}
+    </div>
+    <h1 class="page-header-title">{{ survey.title }}</h1>
+    <p class="page-header-sub">
+      <i class="bi bi-calendar3 me-1"></i>Created {{ survey.created_at|date:"d M Y" }}
+      {% if survey.created_by %} · by {{ survey.created_by.get_full_name|default:survey.created_by.email }}{% endif %}
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'surveys:builder' survey.pk %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">
+      <i class="bi bi-pencil-square me-1"></i>Open Builder
+    </a>
+    {% if survey.status == 'active' %}
+      <a href="{% url 'surveys:results' survey.pk %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;">
+        <i class="bi bi-bar-chart-line me-1"></i>View Results
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Stats row -->
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="stat-block">
+      <div class="ico" style="background:rgba(0,119,200,0.12);color:var(--dodo-blue);">
+        <i class="bi bi-list-check"></i>
+      </div>
+      <div class="val">{{ survey.questions.count }}</div>
+      <div class="lbl">Questions</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-block">
+      <div class="ico" style="background:rgba(22,163,74,0.12);color:#16a34a;">
+        <i class="bi bi-people"></i>
+      </div>
+      <div class="val">{{ survey.get_response_count }}</div>
+      <div class="lbl">Responses</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-block">
+      <div class="ico" style="background:rgba(245,158,11,0.12);color:#f59e0b;">
+        <i class="bi bi-graph-up"></i>
+      </div>
+      <div class="val">{{ survey.get_completion_rate }}%</div>
+      <div class="lbl">Completion</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-block">
+      <div class="ico" style="background:rgba(124,58,237,0.12);color:#7c3aed;">
+        <i class="bi bi-question-circle"></i>
+      </div>
+      <div class="val">{{ survey.questions|length }}</div>
+      <div class="lbl">Required: {{ required_count|default:0 }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <!-- Description -->
+    <div class="info-card">
+      <div class="head"><i class="bi bi-info-circle" style="color:var(--dodo-blue);"></i>About This Survey</div>
+      <div class="body">
+        {% if survey.description %}
+          <p style="font-size:0.88rem;color:#475569;line-height:1.6;margin-bottom:1rem;">{{ survey.description }}</p>
+        {% else %}
+          <p class="text-muted" style="font-size:0.85rem;">No description provided.</p>
+        {% endif %}
+
+        {% if survey.instructions %}
+          <div style="font-size:0.72rem;text-transform:uppercase;font-weight:700;color:#94a3b8;letter-spacing:.03em;margin-bottom:.4rem;">
+            Respondent Instructions
+          </div>
+          <div style="font-size:0.85rem;color:#475569;background:#fafbfc;border-left:3px solid var(--dodo-blue);padding:.6rem .85rem;border-radius:6px;white-space:pre-wrap;">{{ survey.instructions }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Question summary -->
+    <div class="info-card">
+      <div class="head d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check" style="color:var(--dodo-blue);"></i>Questions Overview</span>
+        <a href="{% url 'surveys:builder' survey.pk %}" style="font-size:0.78rem;color:var(--dodo-blue);text-decoration:none;font-weight:500;">
+          <i class="bi bi-pencil me-1"></i>Edit in builder
+        </a>
+      </div>
+      <div class="body p-0">
+        {% if survey.questions.exists %}
+        <ol style="list-style:none;padding:0;margin:0;counter-reset:qnum;">
+          {% for q in survey.questions.all %}
+          <li style="padding:.7rem 1.1rem;border-bottom:1px solid #f1f5f9;counter-increment:qnum;display:flex;gap:.75rem;align-items:flex-start;">
+            <span style="width:28px;height:28px;border-radius:50%;background:#f0f7ff;color:var(--dodo-blue);display:inline-flex;align-items:center;justify-content:center;font-size:0.78rem;font-weight:700;flex-shrink:0;">
+              {{ q.order }}
+            </span>
+            <div style="flex-grow:1;min-width:0;">
+              <div style="font-size:0.86rem;font-weight:500;color:#0f172a;line-height:1.35;">
+                {{ q.text }}
+                {% if q.is_required %}<span class="text-danger" style="font-weight:700;">*</span>{% endif %}
+              </div>
+              <div style="font-size:0.72rem;color:#64748b;margin-top:.2rem;display:flex;gap:.5rem;flex-wrap:wrap;">
+                <span class="badge bg-light text-dark" style="font-size:0.66rem;">{{ q.get_question_type_display }}</span>
+                {% if q.question_type == 'radio' or q.question_type == 'checkbox' or q.question_type == 'dropdown' %}
+                  <span>{{ q.choices.count }} choice{{ q.choices.count|pluralize }}</span>
+                {% endif %}
+                {% if q.question_type == 'likert' or q.question_type == 'rating' %}
+                  <span>Scale {{ q.scale_min }}–{{ q.scale_max }}</span>
+                {% endif %}
+              </div>
+            </div>
+          </li>
+          {% endfor %}
+        </ol>
+        {% else %}
+        <div style="text-align:center;padding:2rem 1rem;color:#94a3b8;">
+          <i class="bi bi-plus-circle-dotted d-block mb-2" style="font-size:2rem;color:#cbd5e1;"></i>
+          <div style="font-size:0.85rem;margin-bottom:1rem;">No questions yet.</div>
+          <a href="{% url 'surveys:builder' survey.pk %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;">
+            <i class="bi bi-plus-lg me-1"></i>Add Questions
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <!-- Share -->
+    {% if survey.status == 'active' %}
+    <div class="share-box mb-3">
+      <div style="font-size:0.78rem;font-weight:700;color:var(--dodo-blue);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem;">
+        <i class="bi bi-link-45deg me-1"></i>Public Share Link
+      </div>
+      <div class="share-url" id="shareUrl">{{ request.scheme }}://{{ request.get_host }}{% url 'surveys:respond' survey.pk %}</div>
+      <div class="d-flex gap-2 mt-2">
+        <button onclick="copyShareLink()" class="btn btn-sm flex-grow-1" style="background:var(--dodo-blue);color:#fff;border-radius:7px;font-size:0.78rem;">
+          <i class="bi bi-clipboard me-1"></i><span id="copyLabel">Copy link</span>
+        </button>
+        <a href="{% url 'surveys:respond' survey.pk %}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary" style="border-radius:7px;font-size:0.78rem;">
+          <i class="bi bi-box-arrow-up-right"></i>
+        </a>
+      </div>
+    </div>
+    {% else %}
+    <div class="info-card" style="border-color:#fde68a;background:#fffbeb;">
+      <div class="body">
+        <div style="font-size:0.85rem;color:#854d0e;font-weight:600;">
+          <i class="bi bi-exclamation-triangle me-1"></i>Not accepting responses
+        </div>
+        <div style="font-size:0.78rem;color:#92400e;margin-top:.3rem;line-height:1.5;">
+          This survey is in <strong>{{ survey.get_status_display }}</strong> status. Open the builder to add questions and publish it.
+        </div>
+        <a href="{% url 'surveys:builder' survey.pk %}" class="btn btn-sm mt-2" style="background:var(--dodo-blue);color:#fff;border-radius:7px;font-size:0.8rem;">
+          <i class="bi bi-pencil-square me-1"></i>Open Builder
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Details -->
+    <div class="info-card">
+      <div class="head"><i class="bi bi-gear" style="color:#64748b;"></i>Details</div>
+      <div class="body p-0" style="padding:0 1.1rem;">
+        <div class="field-row">
+          <div class="lbl">Type</div>
+          <div class="val">{{ survey.get_survey_type_display }}</div>
+        </div>
+        <div class="field-row">
+          <div class="lbl">Privacy</div>
+          <div class="val">
+            {% if survey.is_anonymous %}
+              <i class="bi bi-eye-slash me-1" style="color:#94a3b8;"></i>Anonymous
+            {% else %}
+              <i class="bi bi-person me-1" style="color:#94a3b8;"></i>Named
+            {% endif %}
+          </div>
+        </div>
+        {% if survey.project %}
+        <div class="field-row">
+          <div class="lbl">Project</div>
+          <div class="val">
+            <a href="{% url 'projects:detail' survey.project.pk %}" style="color:var(--dodo-blue);text-decoration:none;">
+              {{ survey.project.display_title|truncatechars:40 }}
+            </a>
+          </div>
+        </div>
+        {% endif %}
+        <div class="field-row">
+          <div class="lbl">Created</div>
+          <div class="val">{{ survey.created_at|date:"d M Y H:i" }}</div>
+        </div>
+        {% if survey.updated_at %}
+        <div class="field-row">
+          <div class="lbl">Updated</div>
+          <div class="val">{{ survey.updated_at|date:"d M Y H:i" }}</div>
+        </div>
+        {% endif %}
+        {% if survey.start_date %}
+        <div class="field-row">
+          <div class="lbl">Opens</div>
+          <div class="val">{{ survey.start_date|date:"d M Y" }}</div>
+        </div>
+        {% endif %}
+        {% if survey.end_date %}
+        <div class="field-row">
+          <div class="lbl">Closes</div>
+          <div class="val">{{ survey.end_date|date:"d M Y" }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="info-card">
+      <div class="head"><i class="bi bi-lightning" style="color:#f59e0b;"></i>Quick Actions</div>
+      <div class="body p-0">
+        <a href="{% url 'surveys:builder' survey.pk %}" class="d-block p-3 border-bottom text-decoration-none" style="color:#1a202c;font-size:0.85rem;">
+          <i class="bi bi-pencil-square me-2" style="color:var(--dodo-blue);"></i>Edit questions
+        </a>
+        <a href="{% url 'surveys:results' survey.pk %}" class="d-block p-3 border-bottom text-decoration-none" style="color:#1a202c;font-size:0.85rem;">
+          <i class="bi bi-bar-chart me-2" style="color:#16a34a;"></i>View results
+        </a>
+        {% if survey.status == 'active' %}
+        <a href="{% url 'surveys:respond' survey.pk %}" target="_blank" rel="noopener" class="d-block p-3 text-decoration-none" style="color:#1a202c;font-size:0.85rem;">
+          <i class="bi bi-box-arrow-up-right me-2" style="color:#f59e0b;"></i>Preview respondent view
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyShareLink() {
+  const url = document.getElementById('shareUrl').textContent;
+  navigator.clipboard.writeText(url).then(() => {
+    const lbl = document.getElementById('copyLabel');
+    const orig = lbl.textContent;
+    lbl.textContent = 'Copied!';
+    setTimeout(() => { lbl.textContent = orig; }, 1500);
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,274 @@
+{% extends 'base.html' %}
+{% block title %}Projects — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item active">Projects</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.filter-bar { background:#fff; border-radius:12px; border:1px solid #e2e8f0; padding:0.75rem 1rem; margin-bottom:1rem; }
+.project-card { border:1px solid #e2e8f0; border-radius:12px; transition:all .15s ease; height:100%; }
+.project-card:hover { border-color:var(--dodo-blue); box-shadow:0 4px 12px rgba(0,119,200,0.08); transform:translateY(-1px); }
+.project-card a.title-link { color:#0f172a; text-decoration:none; }
+.project-card a.title-link:hover { color:var(--dodo-blue); }
+.unit-stripe { height:4px; border-radius:12px 12px 0 0; }
+.meta-row { font-size:0.76rem; color:#64748b; }
+.meta-row i { color:#94a3b8; }
+.empty-state { padding:3rem 1rem; text-align:center; color:#64748b; }
+.empty-state i { font-size:2.5rem; color:#cbd5e1; display:block; margin-bottom:.5rem; }
+.view-toggle .btn { border-radius:7px; font-size:0.78rem; padding:0.25rem 0.6rem; }
+.view-toggle .btn.active { background:var(--dodo-blue); color:#fff; border-color:var(--dodo-blue); }
+.summary-chip { display:inline-flex; align-items:center; gap:.35rem; padding:.25rem .6rem; border-radius:20px; background:#f1f5f9; font-size:0.75rem; color:#475569; font-weight:500; }
+.summary-chip .dot { width:8px; height:8px; border-radius:50%; }
+/* Table view */
+.projects-table th { font-size:0.72rem; text-transform:uppercase; letter-spacing:.03em; color:#64748b; font-weight:600; background:#f8fafc; }
+.projects-table td { font-size:0.83rem; vertical-align:middle; }
+.projects-table tr:hover { background:#f8fafc; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-folder2-open me-2" style="color:var(--dodo-blue);"></i>Projects</h1>
+    <p class="page-header-sub">Country Office project portfolio — {{ projects|length }} total</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'projects:tracker' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-table me-1"></i>Tracker
+    </a>
+    <a href="{% url 'projects:create' %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-plus-lg me-1"></i>New Project
+    </a>
+  </div>
+</div>
+
+<!-- Summary chips -->
+<div class="d-flex gap-2 flex-wrap mb-3">
+  {% for sc, sl in status_choices %}
+    {% with count=0 %}
+      {% regroup projects by status as status_groups %}
+      {% for g in status_groups %}{% if g.grouper == sc %}
+        <span class="summary-chip">
+          <span class="dot" style="background:{% if sc == 'active' %}#16a34a{% elif sc == 'pipeline' %}#0ea5e9{% elif sc == 'ending' %}#f59e0b{% elif sc == 'closed' %}#64748b{% elif sc == 'suspended' %}#dc2626{% else %}#94a3b8{% endif %};"></span>
+          {{ sl }} <strong style="color:#0f172a;">{{ g.list|length }}</strong>
+        </span>
+      {% endif %}{% endfor %}
+    {% endwith %}
+  {% endfor %}
+</div>
+
+<!-- Filter bar -->
+<div class="filter-bar d-flex gap-3 align-items-center flex-wrap">
+  <form method="get" class="d-flex gap-2 align-items-center flex-wrap flex-grow-1">
+    <div class="d-flex align-items-center gap-2">
+      <label style="font-size:0.8rem;font-weight:600;color:#374151;white-space:nowrap;">Unit</label>
+      <select name="unit" class="form-select form-select-sm" style="min-width:180px;border-radius:7px;" onchange="this.form.submit()">
+        <option value="">All units</option>
+        {% for u in units %}
+          <option value="{{ u.pk }}" {% if unit_filter == u.pk|stringformat:'s' %}selected{% endif %}>{{ u.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <label style="font-size:0.8rem;font-weight:600;color:#374151;white-space:nowrap;">Status</label>
+      <select name="status" class="form-select form-select-sm" style="min-width:160px;border-radius:7px;" onchange="this.form.submit()">
+        <option value="">All statuses</option>
+        {% for sc, sl in status_choices %}
+          <option value="{{ sc }}" {% if status_filter == sc %}selected{% endif %}>{{ sl }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width:320px;">
+      <input type="search" id="searchBox" class="form-control form-control-sm" placeholder="Search title, PIMS ID, donor…" style="border-radius:7px;font-size:0.82rem;">
+    </div>
+    {% if status_filter or unit_filter %}
+      <a href="{% url 'projects:list' %}" class="btn btn-sm btn-link" style="font-size:0.78rem;text-decoration:none;color:#64748b;">
+        <i class="bi bi-x-circle me-1"></i>Clear
+      </a>
+    {% endif %}
+  </form>
+
+  <div class="view-toggle d-flex gap-1" role="group">
+    <button class="btn btn-sm btn-outline-secondary active" data-view="grid" type="button" title="Grid view">
+      <i class="bi bi-grid-3x3-gap"></i>
+    </button>
+    <button class="btn btn-sm btn-outline-secondary" data-view="table" type="button" title="Table view">
+      <i class="bi bi-list-ul"></i>
+    </button>
+  </div>
+</div>
+
+<!-- Grid view -->
+<div id="gridView" class="row g-3">
+  {% for p in projects %}
+  <div class="col-md-6 col-xl-4 project-item"
+       data-search="{{ p.title|lower }} {{ p.pims_id|lower }} {{ p.donor|lower }} {{ p.short_title|lower }}">
+    <div class="project-card">
+      <div class="unit-stripe" style="background:{% if p.programme_unit %}{{ p.programme_unit.color }}{% else %}#cbd5e1{% endif %};"></div>
+      <div class="p-3">
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+          {% if p.pims_id %}
+            <span class="badge bg-light text-dark" style="font-size:0.68rem;">{{ p.pims_id }}</span>
+          {% endif %}
+          <span class="badge badge-{{ p.status }}">{{ p.get_status_display }}</span>
+          {% if p.donor_type %}
+            <span class="badge bg-light text-dark" style="font-size:0.68rem;">{{ p.get_donor_type_display }}</span>
+          {% endif %}
+        </div>
+        <a href="{% url 'projects:detail' p.pk %}" class="title-link">
+          <h6 style="font-weight:600;font-size:0.92rem;line-height:1.35;margin-bottom:.5rem;" title="{{ p.title }}">
+            {{ p.display_title }}
+          </h6>
+        </a>
+        {% if p.programme_unit %}
+          <div style="font-size:0.72rem;font-weight:600;color:{{ p.programme_unit.color }};margin-bottom:.4rem;">
+            <i class="bi bi-diagram-3 me-1"></i>{{ p.programme_unit.name }}
+          </div>
+        {% endif %}
+        <div class="meta-row mb-1">
+          <i class="bi bi-calendar3 me-1"></i>{{ p.start_date|date:"M Y" }} – {{ p.end_date|date:"M Y" }}
+        </div>
+        {% if p.donor %}
+        <div class="meta-row mb-1">
+          <i class="bi bi-briefcase me-1"></i>{{ p.donor|truncatechars:40 }}
+        </div>
+        {% endif %}
+        {% if p.responsible_person %}
+        <div class="meta-row">
+          <i class="bi bi-person me-1"></i>{{ p.responsible_person }}
+        </div>
+        {% endif %}
+      </div>
+      <div class="px-3 py-2 border-top d-flex justify-content-between align-items-center" style="background:#fafbfc;border-radius:0 0 12px 12px;">
+        <a href="{% url 'projects:detail' p.pk %}" style="font-size:0.78rem;color:var(--dodo-blue);text-decoration:none;font-weight:500;">
+          View details <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+        <a href="{% url 'projects:edit' p.pk %}" title="Edit" style="color:#94a3b8;">
+          <i class="bi bi-pencil"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="col-12">
+    <div class="card">
+      <div class="empty-state">
+        <i class="bi bi-folder2-open"></i>
+        <h6 style="font-weight:600;color:#1e293b;">No projects found</h6>
+        <p style="font-size:0.85rem;margin-bottom:1rem;">
+          {% if status_filter or unit_filter %}
+            No projects match the current filters.
+            <a href="{% url 'projects:list' %}" style="color:var(--dodo-blue);">Clear filters</a>
+          {% else %}
+            Get started by creating your first project.
+          {% endif %}
+        </p>
+        <a href="{% url 'projects:create' %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;">
+          <i class="bi bi-plus-lg me-1"></i>New Project
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Table view (hidden by default) -->
+<div id="tableView" style="display:none;">
+  <div class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table projects-table mb-0">
+          <thead>
+            <tr>
+              <th style="width:40%;">Project</th>
+              <th>Unit</th>
+              <th>Status</th>
+              <th>Donor</th>
+              <th>Timeline</th>
+              <th style="width:1%;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in projects %}
+            <tr class="project-item" data-search="{{ p.title|lower }} {{ p.pims_id|lower }} {{ p.donor|lower }}">
+              <td>
+                {% if p.pims_id %}<div style="font-size:0.7rem;color:#94a3b8;">{{ p.pims_id }}</div>{% endif %}
+                <a href="{% url 'projects:detail' p.pk %}" style="color:#0f172a;text-decoration:none;font-weight:500;">
+                  {{ p.display_title }}
+                </a>
+              </td>
+              <td>
+                {% if p.programme_unit %}
+                  <span class="badge" style="background:{{ p.programme_unit.color }};color:#fff;font-size:0.7rem;">
+                    {{ p.programme_unit.name }}
+                  </span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td><span class="badge badge-{{ p.status }}">{{ p.get_status_display }}</span></td>
+              <td style="font-size:0.8rem;">
+                {{ p.donor|default:"—"|truncatechars:30 }}
+                {% if p.donor_type %}<span class="badge bg-light text-dark" style="font-size:0.66rem;">{{ p.get_donor_type_display }}</span>{% endif %}
+              </td>
+              <td style="font-size:0.78rem;color:#64748b;white-space:nowrap;">
+                {{ p.start_date|date:"M Y" }} – {{ p.end_date|date:"M Y" }}
+              </td>
+              <td>
+                <a href="{% url 'projects:edit' p.pk %}" class="btn btn-sm btn-outline-secondary" style="border-radius:6px;padding:.15rem .4rem;">
+                  <i class="bi bi-pencil"></i>
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center py-4 text-muted">No projects found</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="noMatches" class="card mt-3" style="display:none;">
+  <div class="empty-state">
+    <i class="bi bi-search"></i>
+    <div style="font-size:0.88rem;">No projects match your search.</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// View toggle
+const gridView = document.getElementById('gridView');
+const tableView = document.getElementById('tableView');
+document.querySelectorAll('.view-toggle .btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.view-toggle .btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    const v = this.dataset.view;
+    gridView.style.display = v === 'grid' ? '' : 'none';
+    tableView.style.display = v === 'table' ? '' : 'none';
+  });
+});
+
+// Client-side search
+const searchBox = document.getElementById('searchBox');
+const noMatches = document.getElementById('noMatches');
+if (searchBox) {
+  searchBox.addEventListener('input', function() {
+    const q = this.value.trim().toLowerCase();
+    let visible = 0;
+    document.querySelectorAll('.project-item').forEach(el => {
+      const hay = el.dataset.search || '';
+      const show = !q || hay.indexOf(q) !== -1;
+      el.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    noMatches.style.display = (visible === 0 && q) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

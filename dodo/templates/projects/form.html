@@ -1,0 +1,343 @@
+{% extends 'base.html' %}
+{% block title %}{% if project %}Edit{% else %}New{% endif %} Project — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'projects:list' %}" style="color:var(--dodo-blue);text-decoration:none;">Projects</a></li>
+{% if project %}
+<li class="breadcrumb-item"><a href="{% url 'projects:detail' project.pk %}" style="color:var(--dodo-blue);text-decoration:none;">{{ project.display_title|truncatechars:30 }}</a></li>
+<li class="breadcrumb-item active">Edit</li>
+{% else %}
+<li class="breadcrumb-item active">New</li>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-section { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.25rem 1.5rem; margin-bottom:1rem; }
+.form-section-title { font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--dodo-blue); margin-bottom:1rem; display:flex; align-items:center; gap:.5rem; }
+.form-section-title .num { width:22px; height:22px; border-radius:50%; background:var(--dodo-blue); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:0.72rem; }
+.field-label { font-size:0.78rem; font-weight:600; color:#374151; margin-bottom:.3rem; }
+.field-label .req { color:#dc2626; }
+.field-hint { font-size:0.72rem; color:#94a3b8; margin-top:.2rem; }
+.form-control, .form-select { font-size:0.87rem; border-radius:8px; border-color:#e2e8f0; }
+.form-control:focus, .form-select:focus { border-color:var(--dodo-blue); box-shadow:0 0 0 3px rgba(0,119,200,0.12); }
+textarea.form-control { min-height:90px; }
+.sticky-actions { position:sticky; bottom:0; background:#fff; border-top:1px solid #e2e8f0; padding:0.75rem 1rem; margin:0 -15px; z-index:10; border-radius:0 0 12px 12px; box-shadow:0 -4px 12px rgba(0,0,0,0.04); }
+.status-pill-option { display:inline-flex; align-items:center; gap:.4rem; padding:.4rem .85rem; border-radius:20px; border:1.5px solid #e2e8f0; font-size:0.8rem; font-weight:500; cursor:pointer; background:#fff; transition:all .12s; }
+.status-pill-option input { display:none; }
+.status-pill-option:hover { border-color:#cbd5e1; }
+.status-pill-option.selected { border-color:var(--dodo-blue); background:rgba(0,119,200,0.08); color:var(--dodo-blue); }
+.donor-type-option { cursor:pointer; padding:.55rem .9rem; border:1.5px solid #e2e8f0; border-radius:8px; font-size:0.8rem; text-align:center; background:#fff; transition:all .12s; font-weight:500; }
+.donor-type-option input { display:none; }
+.donor-type-option:hover { border-color:#cbd5e1; }
+.donor-type-option.selected { border-color:var(--dodo-blue); background:rgba(0,119,200,0.08); color:var(--dodo-blue); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title">
+      <i class="bi bi-{% if project %}pencil-square{% else %}plus-square{% endif %} me-2" style="color:var(--dodo-blue);"></i>
+      {% if project %}Edit Project{% else %}New Project{% endif %}
+    </h1>
+    <p class="page-header-sub">
+      {% if project %}Update details for <strong>{{ project.display_title }}</strong>{% else %}Register a new project in the country office portfolio{% endif %}
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% if project %}{% url 'projects:detail' project.pk %}{% else %}{% url 'projects:list' %}{% endif %}"
+       class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">
+      <i class="bi bi-x-lg me-1"></i>Cancel
+    </a>
+  </div>
+</div>
+
+{% if messages %}
+  {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show" style="border-radius:10px;font-size:0.85rem;">
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<form method="post" id="projectForm" novalidate
+      action="{% if project %}{% url 'projects:edit' project.pk %}{% else %}{% url 'projects:create' %}{% endif %}">
+  {% csrf_token %}
+
+  <div class="row">
+    <div class="col-lg-8">
+      <!-- Section 1: Basics -->
+      <div class="form-section">
+        <div class="form-section-title"><span class="num">1</span>Project Identification</div>
+
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="field-label">PIMS ID</label>
+            <input type="text" name="pims_id" class="form-control" placeholder="e.g. 00123456"
+                   value="{{ project.pims_id|default:'' }}">
+            <div class="field-hint">Project Information Management System ID</div>
+          </div>
+          <div class="col-md-8">
+            <label class="field-label">Short Title</label>
+            <input type="text" name="short_title" class="form-control" maxlength="100"
+                   placeholder="Brief name shown in lists and tables"
+                   value="{{ project.short_title|default:'' }}">
+            <div class="field-hint">Keep under 100 characters — used in the tracker</div>
+          </div>
+
+          <div class="col-12">
+            <label class="field-label">Full Title <span class="req">*</span></label>
+            <textarea name="title" class="form-control" required
+                      placeholder="Full official project title">{{ project.title|default:'' }}</textarea>
+          </div>
+
+          <div class="col-12">
+            <label class="field-label">Description</label>
+            <textarea name="description" class="form-control"
+                      placeholder="What is this project about?">{{ project.description|default:'' }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 2: Programme alignment -->
+      <div class="form-section">
+        <div class="form-section-title"><span class="num">2</span>Programme Alignment</div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="field-label">Programme Unit <span class="req">*</span></label>
+            <select name="programme_unit" class="form-select" required>
+              <option value="">— Select a unit —</option>
+              {% for u in units %}
+                <option value="{{ u.pk }}"
+                        {% if project.programme_unit_id == u.pk %}selected{% endif %}>
+                  {{ u.name }}
+                </option>
+              {% endfor %}
+            </select>
+            <div class="field-hint">Thematic cluster this project belongs to</div>
+          </div>
+
+          <div class="col-md-6">
+            <label class="field-label">Status</label>
+            <div class="d-flex flex-wrap gap-2 mt-1" id="statusGroup">
+              {% for sc, sl in status_choices %}
+                <label class="status-pill-option {% if project.status == sc or not project and sc == 'active' %}selected{% endif %}">
+                  <input type="radio" name="status" value="{{ sc }}"
+                         {% if project.status == sc or not project and sc == 'active' %}checked{% endif %}>
+                  {% if sc == 'active' %}<i class="bi bi-play-circle-fill" style="color:#16a34a;"></i>
+                  {% elif sc == 'pipeline' %}<i class="bi bi-hourglass-split" style="color:#0ea5e9;"></i>
+                  {% elif sc == 'ending' %}<i class="bi bi-flag-fill" style="color:#f59e0b;"></i>
+                  {% elif sc == 'closed' %}<i class="bi bi-check-circle-fill" style="color:#64748b;"></i>
+                  {% elif sc == 'suspended' %}<i class="bi bi-pause-circle-fill" style="color:#dc2626;"></i>
+                  {% endif %}
+                  {{ sl }}
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3: Donor -->
+      <div class="form-section">
+        <div class="form-section-title"><span class="num">3</span>Donor & Funding</div>
+
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="field-label">Donor</label>
+            <input type="text" name="donor" class="form-control" maxlength="200"
+                   placeholder="e.g. European Union, UNDP TRAC"
+                   value="{{ project.donor|default:'' }}">
+          </div>
+
+          <div class="col-md-4">
+            <label class="field-label">Total Budget (USD)</label>
+            <div class="input-group">
+              <span class="input-group-text" style="background:#f8fafc;font-size:0.85rem;">$</span>
+              <input type="number" name="total_budget" class="form-control" step="0.01" min="0"
+                     placeholder="0.00"
+                     value="{{ project.total_budget|default_if_none:'' }}">
+            </div>
+          </div>
+
+          <div class="col-12">
+            <label class="field-label">Donor Type</label>
+            <div class="row g-2 mt-1">
+              {% for dc, dl in donor_types %}
+              <div class="col-6 col-md-auto">
+                <label class="donor-type-option d-block {% if project.donor_type == dc %}selected{% endif %}">
+                  <input type="radio" name="donor_type" value="{{ dc }}"
+                         {% if project.donor_type == dc %}checked{% endif %}>
+                  {{ dl }}
+                </label>
+              </div>
+              {% endfor %}
+            </div>
+            <div class="field-hint mt-1">PBF · GEF · Bilateral · TRAC · Other</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 4: Timeline -->
+      <div class="form-section">
+        <div class="form-section-title"><span class="num">4</span>Timeline</div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="field-label">Start Date <span class="req">*</span></label>
+            <input type="date" name="start_date" class="form-control" required
+                   value="{{ project.start_date|date:'Y-m-d' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="field-label">End Date <span class="req">*</span></label>
+            <input type="date" name="end_date" class="form-control" required
+                   value="{{ project.end_date|date:'Y-m-d' }}">
+          </div>
+          <div class="col-12">
+            <div id="durationHint" class="field-hint" style="display:none;">
+              <i class="bi bi-clock-history me-1"></i>
+              Duration: <span id="durationText"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 5: Responsibility -->
+      <div class="form-section">
+        <div class="form-section-title"><span class="num">5</span>Responsibility & Oversight</div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="field-label">Responsible Person</label>
+            <input type="text" name="responsible_person" class="form-control"
+                   placeholder="Primary point of contact"
+                   value="{{ project.responsible_person|default:'' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="field-label">Data Source / Implementing Partner</label>
+            <input type="text" name="data_source_partner" class="form-control"
+                   placeholder="Organization providing data / delivering"
+                   value="{{ project.data_source_partner|default:'' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right sidebar -->
+    <div class="col-lg-4">
+      <div class="form-section" style="position:sticky;top:1rem;">
+        <div class="form-section-title"><i class="bi bi-info-circle" style="color:var(--dodo-blue);"></i>Tips</div>
+        <ul style="font-size:0.82rem;color:#475569;padding-left:1.1rem;line-height:1.55;">
+          <li class="mb-2"><strong>PIMS ID</strong> is optional but strongly recommended — it links this project to Atlas/Quantum.</li>
+          <li class="mb-2"><strong>Short title</strong> appears in the reporting tracker where space is tight.</li>
+          <li class="mb-2"><strong>Programme Unit</strong> determines which cluster this project rolls up into.</li>
+          <li class="mb-2"><strong>Status</strong> can be changed at any time — use "Pipeline" for projects in development.</li>
+          <li>After creation, you can assign team roles, link CPD outcomes, and configure reporting cycles.</li>
+        </ul>
+      </div>
+
+      {% if project %}
+      <div class="form-section" style="border-color:#fecaca;background:#fef2f2;">
+        <div class="form-section-title" style="color:#991b1b;">
+          <i class="bi bi-exclamation-triangle"></i>Danger Zone
+        </div>
+        <p style="font-size:0.8rem;color:#7f1d1d;margin-bottom:.75rem;">
+          Setting a project to <strong>Closed</strong> or <strong>Suspended</strong> disables it from active reporting tracking.
+        </p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Sticky action bar -->
+  <div class="sticky-actions d-flex justify-content-between align-items-center gap-2">
+    <div style="font-size:0.78rem;color:#94a3b8;">
+      <i class="bi bi-shield-check me-1"></i>
+      {% if project %}Changes will be saved to this project{% else %}Fields marked <span class="req" style="color:#dc2626;">*</span> are required{% endif %}
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% if project %}{% url 'projects:detail' project.pk %}{% else %}{% url 'projects:list' %}{% endif %}"
+         class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">Cancel</a>
+      <button type="submit" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;padding:.4rem 1.2rem;">
+        <i class="bi bi-{% if project %}check-lg{% else %}plus-lg{% endif %} me-1"></i>
+        {% if project %}Save Changes{% else %}Create Project{% endif %}
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Pill / chip selection handlers
+function wirePillGroup(selector) {
+  document.querySelectorAll(selector).forEach(label => {
+    label.addEventListener('click', function() {
+      const name = this.querySelector('input').name;
+      document.querySelectorAll(`${selector}`).forEach(l => {
+        if (l.querySelector('input').name === name) l.classList.remove('selected');
+      });
+      this.classList.add('selected');
+    });
+  });
+}
+wirePillGroup('.status-pill-option');
+wirePillGroup('.donor-type-option');
+
+// Date range helper
+const startInput = document.querySelector('input[name="start_date"]');
+const endInput = document.querySelector('input[name="end_date"]');
+const hint = document.getElementById('durationHint');
+const hintText = document.getElementById('durationText');
+
+function updateDuration() {
+  if (!startInput.value || !endInput.value) {
+    hint.style.display = 'none';
+    return;
+  }
+  const s = new Date(startInput.value);
+  const e = new Date(endInput.value);
+  if (e < s) {
+    hint.style.display = '';
+    hint.style.color = '#dc2626';
+    hintText.textContent = 'End date is before start date';
+    return;
+  }
+  const months = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+  const years = Math.floor(months / 12);
+  const remMonths = months % 12;
+  let txt = '';
+  if (years) txt += `${years} year${years > 1 ? 's' : ''}`;
+  if (remMonths) txt += (txt ? ', ' : '') + `${remMonths} month${remMonths > 1 ? 's' : ''}`;
+  if (!txt) txt = 'less than a month';
+  hint.style.display = '';
+  hint.style.color = '#94a3b8';
+  hintText.textContent = txt;
+}
+if (startInput && endInput) {
+  startInput.addEventListener('change', updateDuration);
+  endInput.addEventListener('change', updateDuration);
+  updateDuration();
+}
+
+// Basic client-side validation
+document.getElementById('projectForm').addEventListener('submit', function(e) {
+  const title = this.querySelector('textarea[name="title"]').value.trim();
+  const unit = this.querySelector('select[name="programme_unit"]').value;
+  const start = this.querySelector('input[name="start_date"]').value;
+  const end = this.querySelector('input[name="end_date"]').value;
+  if (!title || !unit || !start || !end) {
+    // HTML5 required will handle most of this; browsers vary on textarea[required]
+    return;
+  }
+  if (new Date(end) < new Date(start)) {
+    e.preventDefault();
+    alert('End date cannot be before start date.');
+  }
+});
+</script>
+{% endblock %}

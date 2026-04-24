@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% block title %}New Delegation  — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'notifications:delegations' %}" style="color:var(--dodo-blue);text-decoration:none;">Delegations</a></li>
+<li class="breadcrumb-item active">New</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-arrow-left-right me-2" style="color:var(--dodo-blue);"></i>Delegate Report Preparation</h1>
+    <p class="page-header-sub">Assign a user to prepare reports on behalf of the project team. The delegated user will receive edit access and notifications.</p>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-8">
+    <form method="post" action="{% url 'notifications:delegate' %}">
+      {% csrf_token %}
+      <div class="card">
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Project <span class="text-danger">*</span></label>
+              <select name="project" class="form-select" required style="border-radius:8px;">
+                <option value="">Select a project...</option>
+                {% for p in projects %}
+                <option value="{{ p.pk }}">
+                  {% if p.pims_id %}[{{ p.pims_id }}] {% endif %}{{ p.display_title }}
+                  ({{ p.programme_unit.name }})
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Cycle</label>
+              <select name="cycle" class="form-select" style="border-radius:8px;">
+                <option value="">— Any cycle —</option>
+                {% for c in cycles %}
+                <option value="{{ c.pk }}">{{ c.year }} {{ c.quarter }} — {{ c.get_cycle_type_display }}</option>
+                {% endfor %}
+              </select>
+              <small class="text-muted" style="font-size:0.72rem;">Leave blank for ongoing delegation</small>
+            </div>
+
+            <div class="col-md-8">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Delegate To <span class="text-danger">*</span></label>
+              <select name="delegated_to" class="form-select" required style="border-radius:8px;">
+                <option value="">Select a user...</option>
+                {% for u in users %}
+                <option value="{{ u.pk }}">{{ u.get_full_name }} ({{ u.email }}) — {{ u.position|default:"—" }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Delegation Type</label>
+              <select name="delegation_type" class="form-select" style="border-radius:8px;">
+                {% for value, label in delegation_types %}
+                <option value="{{ value }}" {% if value == 'full' %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Start Date</label>
+              <input type="date" name="start_date" class="form-control" value="{{ today|date:'Y-m-d' }}" style="border-radius:8px;">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">End Date <small class="text-muted">(optional)</small></label>
+              <input type="date" name="end_date" class="form-control" style="border-radius:8px;">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Instructions / Context</label>
+              <textarea name="instructions" class="form-control" rows="4"
+                        placeholder="Provide context, scope, or any specific instructions for this delegation..."
+                        style="border-radius:8px;"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer d-flex gap-2 justify-content-end">
+          <a href="{% url 'notifications:delegations' %}" class="btn btn-outline-secondary" style="border-radius:8px;">Cancel</a>
+          <button type="submit" class="btn" style="background:var(--dodo-blue);color:#fff;border-radius:8px;">
+            <i class="bi bi-send me-1"></i>Delegate & Notify
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-body">
+        <h6 style="font-weight:600;"><i class="bi bi-info-circle me-2" style="color:var(--dodo-blue);"></i>About Delegations</h6>
+        <ul style="font-size:0.82rem;color:#475569;padding-left:1.1rem;">
+          <li class="mb-2"><strong>Draft Preparation</strong>: Delegatee can enter and save draft data only</li>
+          <li class="mb-2"><strong>Full Report Preparation</strong>: Delegatee can enter, edit, and submit the complete report</li>
+          <li class="mb-2"><strong>Review Only</strong>: Delegatee can view and comment but not edit</li>
+          <li class="mb-2"><strong>Data Entry Only</strong>: Delegatee can input quantitative data only</li>
+        </ul>
+        <hr>
+        <div class="alert alert-info" style="font-size:0.78rem;margin:0;">
+          <i class="bi bi-envelope me-1"></i>The delegated user will receive an in-app notification and email with the delegation details.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

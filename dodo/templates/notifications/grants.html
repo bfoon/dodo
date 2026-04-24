@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}Data Access Grants  — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item active">Data Access Grants</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-key me-2" style="color:var(--dodo-blue);"></i>Data Access Grants</h1>
+    <p class="page-header-sub">Grant granular access to specific projects, reports, or data beyond role permissions</p>
+  </div>
+  <a href="{% url 'notifications:grant' %}" class="btn" style="background:var(--dodo-blue);color:#fff;border-radius:8px;">
+    <i class="bi bi-plus-lg me-1"></i>Grant Access
+  </a>
+</div>
+
+<div class="alert alert-info" style="font-size:0.85rem;">
+  <i class="bi bi-info-circle me-1"></i>
+  <strong>Granular access:</strong> Use this to give specific users access to specific resources (single project, entire cluster, survey, indicator, or all data in this office).
+  This is in addition to any role-based permissions they already have.
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead style="background:#f8fafc;">
+        <tr>
+          <th>User</th>
+          <th>Resource</th>
+          <th>Access Level</th>
+          <th>Period</th>
+          <th>Granted By</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in grants %}
+        <tr>
+          <td>
+            <div style="font-weight:500;color:#1a202c;font-size:0.85rem;">{{ g.granted_to.get_full_name }}</div>
+            <small class="text-muted" style="font-size:0.72rem;">{{ g.granted_to.email }}</small>
+          </td>
+          <td>
+            <span class="badge bg-light text-dark" style="font-size:0.72rem;">{{ g.get_resource_type_display }}</span>
+            <div style="font-size:0.82rem;color:#475569;margin-top:2px;">{{ g.resource_name|default:"—" }}</div>
+          </td>
+          <td>
+            {% if g.access_level == 'full' %}
+            <span class="badge" style="background:#fee2e2;color:#991b1b;font-size:0.72rem;"><i class="bi bi-star-fill me-1"></i>{{ g.get_access_level_display }}</span>
+            {% elif g.access_level in 'delete,approve' %}
+            <span class="badge" style="background:#fef3c7;color:#92400e;font-size:0.72rem;">{{ g.get_access_level_display }}</span>
+            {% elif g.access_level == 'edit' %}
+            <span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:0.72rem;">{{ g.get_access_level_display }}</span>
+            {% else %}
+            <span class="badge bg-light text-dark" style="font-size:0.72rem;">{{ g.get_access_level_display }}</span>
+            {% endif %}
+            {% if g.can_delegate %}<span class="badge bg-secondary" style="font-size:0.65rem;" title="Can delegate">↗</span>{% endif %}
+          </td>
+          <td style="font-size:0.78rem;">
+            {{ g.start_date|date:"d M Y" }}
+            {% if g.end_date %} → {{ g.end_date|date:"d M Y" }}{% else %} <span class="text-muted">(no expiry)</span>{% endif %}
+          </td>
+          <td style="font-size:0.78rem;">
+            {{ g.granted_by.get_full_name }}<br>
+            <small class="text-muted" style="font-size:0.7rem;">{{ g.created_at|date:"d M Y H:i" }}</small>
+          </td>
+          <td>
+            {% if g.is_currently_valid %}
+            <span class="badge badge-active">Active</span>
+            {% elif g.revoked_at %}
+            <span class="badge badge-closed" title="Revoked by {{ g.revoked_by.get_full_name }}">Revoked</span>
+            {% else %}
+            <span class="badge badge-not_applicable">Inactive</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if g.is_currently_valid %}
+            <form method="post" action="{% url 'notifications:revoke_grant' g.pk %}" style="margin:0;" onsubmit="return confirm('Revoke this access grant?')">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-danger" style="border-radius:6px;font-size:0.72rem;">Revoke</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center py-5">
+          <i class="bi bi-key fs-2 d-block mb-2" style="color:#cbd5e1;"></i>
+          <div class="text-muted">No data access grants issued yet</div>
+          <small class="text-muted d-block mt-1">Use grants to give specific users access to specific projects or reports.</small>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

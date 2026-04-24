@@ -1,0 +1,237 @@
+{% extends 'base.html' %}
+{% block title %}Output Verification — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'monitoring:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Monitoring</a></li>
+<li class="breadcrumb-item active">Output Verification</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.filter-bar { background:#fff; border-radius:12px; border:1px solid #e2e8f0; padding:.75rem 1rem; margin-bottom:1rem; }
+.verification-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; margin-bottom:.75rem; overflow:hidden; }
+.verification-card .header { padding:.9rem 1.1rem; display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; border-bottom:1px solid #f1f5f9; }
+.verification-card .header .project-title { font-weight:600; color:#0f172a; font-size:0.92rem; flex-grow:1; min-width:200px; }
+.verification-card .header .project-title a { color:inherit; text-decoration:none; }
+.verification-card .header .project-title a:hover { color:var(--dodo-blue); }
+.verification-card .body { padding:.75rem 1.1rem; }
+
+.stage-track { display:grid; grid-template-columns:repeat(5, 1fr); gap:.4rem; position:relative; margin:.5rem 0; }
+.stage-track::before { content:''; position:absolute; top:16px; left:10%; right:10%; height:2px; background:#e2e8f0; z-index:0; }
+.stage { position:relative; z-index:1; text-align:center; }
+.stage .dot { width:32px; height:32px; border-radius:50%; background:#fff; border:2px solid #e2e8f0; display:inline-flex; align-items:center; justify-content:center; color:#cbd5e1; font-size:0.85rem; margin-bottom:.2rem; transition:all .2s; }
+.stage.done .dot { background:#16a34a; border-color:#16a34a; color:#fff; }
+.stage.current .dot { background:var(--dodo-blue); border-color:var(--dodo-blue); color:#fff; animation:pulse 2s infinite; }
+.stage .lbl { font-size:0.68rem; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:.02em; }
+.stage .date { font-size:0.72rem; color:#0f172a; margin-top:.1rem; }
+.stage.empty .date { color:#cbd5e1; }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(0,119,200,0.4); } 50% { box-shadow: 0 0 0 6px rgba(0,119,200,0); } }
+@media (max-width:640px) {
+  .stage-track { grid-template-columns:repeat(2, 1fr); gap:.5rem; }
+  .stage-track::before { display:none; }
+}
+
+.meta-row { display:flex; gap:1.25rem; flex-wrap:wrap; font-size:0.76rem; color:#64748b; margin-top:.4rem; }
+.meta-row .lbl { color:#94a3b8; font-weight:600; text-transform:uppercase; font-size:0.66rem; letter-spacing:.02em; margin-right:.25rem; }
+.notes-box { font-size:0.78rem; color:#475569; background:#fafbfc; border-left:3px solid var(--dodo-blue); padding:.45rem .7rem; border-radius:5px; margin-top:.5rem; }
+
+.empty-state { padding:3rem 1rem; text-align:center; color:#64748b; }
+.empty-state i { font-size:2.5rem; color:#cbd5e1; display:block; margin-bottom:.5rem; }
+
+.legend { display:flex; gap:.5rem; flex-wrap:wrap; font-size:0.72rem; }
+.legend-pill { display:inline-flex; align-items:center; gap:.3rem; padding:.18rem .5rem; border-radius:12px; background:#f1f5f9; color:#475569; font-weight:500; }
+.legend-pill .dot { width:8px; height:8px; border-radius:50%; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-shield-check me-2" style="color:var(--dodo-blue);"></i>Output Verification</h1>
+    <p class="page-header-sub">Track field verification, document review, and validation milestones per project cycle</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'projects:tracker' %}?type=verification" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-table me-1"></i>Tracker View
+    </a>
+  </div>
+</div>
+
+{% if messages %}
+  {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show" style="border-radius:10px;font-size:0.85rem;">
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<div class="filter-bar d-flex gap-3 align-items-center flex-wrap">
+  <input type="search" id="verifSearch" class="form-control form-control-sm"
+         placeholder="Search project or cycle…"
+         style="max-width:320px;border-radius:7px;font-size:0.85rem;">
+
+  <select id="statusFilter" class="form-select form-select-sm" style="max-width:200px;border-radius:7px;font-size:0.82rem;">
+    <option value="">All statuses</option>
+    <option value="pending">Pending</option>
+    <option value="field_verification">Field Verification</option>
+    <option value="documentation_review">Documentation Review</option>
+    <option value="validation_meeting">Validation Meeting</option>
+    <option value="completed">Completed</option>
+    <option value="not_applicable">Not Applicable</option>
+  </select>
+
+  <div class="ms-auto legend">
+    <span class="legend-pill"><span class="dot" style="background:#16a34a;"></span>Completed</span>
+    <span class="legend-pill"><span class="dot" style="background:var(--dodo-blue);"></span>In Progress</span>
+    <span class="legend-pill"><span class="dot" style="background:#e2e8f0;"></span>Pending</span>
+  </div>
+</div>
+
+{% for v in verifications %}
+<div class="verification-card"
+     data-search="{{ v.project.title|lower }} {{ v.project.pims_id|lower }} {{ v.cycle.year }} {{ v.cycle.quarter|lower }}"
+     data-status="{{ v.status }}">
+  <div class="header">
+    <span class="badge bg-light text-dark" style="font-size:0.72rem;">
+      {{ v.cycle.year }} {{ v.cycle.quarter }}
+    </span>
+    <div class="project-title">
+      {% if v.project.pims_id %}<span style="font-size:0.7rem;color:#94a3b8;font-weight:400;">{{ v.project.pims_id }} · </span>{% endif %}
+      <a href="{% url 'projects:detail' v.project.pk %}">{{ v.project.display_title }}</a>
+    </div>
+
+    <span class="badge bg-{{ v.get_status_color }}" style="font-size:0.72rem;padding:.3rem .55rem;">
+      {{ v.get_status_display }}
+    </span>
+
+    <div class="dropdown">
+      <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown" style="border-radius:7px;font-size:0.78rem;padding:.2rem .6rem;">
+        <i class="bi bi-three-dots"></i>
+      </button>
+      <div class="dropdown-menu dropdown-menu-end" style="font-size:0.82rem;border-radius:10px;min-width:280px;padding:.75rem;">
+        <form method="post" action="{% url 'monitoring:update_verification' v.pk %}">
+          {% csrf_token %}
+          <label style="font-size:0.74rem;font-weight:600;color:#374151;">Update Status</label>
+          <select name="status" class="form-select form-select-sm mb-2" style="font-size:0.82rem;border-radius:7px;">
+            <option value="pending" {% if v.status == 'pending' %}selected{% endif %}>Pending</option>
+            <option value="field_verification" {% if v.status == 'field_verification' %}selected{% endif %}>Field Verification</option>
+            <option value="documentation_review" {% if v.status == 'documentation_review' %}selected{% endif %}>Documentation Review</option>
+            <option value="validation_meeting" {% if v.status == 'validation_meeting' %}selected{% endif %}>Validation Meeting</option>
+            <option value="completed" {% if v.status == 'completed' %}selected{% endif %}>Completed</option>
+            <option value="not_applicable" {% if v.status == 'not_applicable' %}selected{% endif %}>Not Applicable</option>
+          </select>
+          <label style="font-size:0.74rem;font-weight:600;color:#374151;">Notes</label>
+          <textarea name="notes" class="form-control form-control-sm mb-2" rows="2"
+                    style="font-size:0.82rem;border-radius:7px;"
+                    placeholder="Optional notes about this update…">{{ v.verification_notes }}</textarea>
+          <button type="submit" class="btn btn-sm w-100" style="background:var(--dodo-blue);color:#fff;border-radius:7px;font-size:0.8rem;">
+            <i class="bi bi-check-lg me-1"></i>Save
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="body">
+    <!-- Stage track -->
+    <div class="stage-track">
+      <div class="stage {% if v.status == 'pending' %}current{% elif v.status != 'pending' %}done{% endif %}">
+        <div class="dot"><i class="bi bi-flag"></i></div>
+        <div class="lbl">Pending</div>
+      </div>
+      <div class="stage {% if v.field_verification_dates %}{% if v.status == 'field_verification' %}current{% else %}done{% endif %}{% else %}empty{% endif %}">
+        <div class="dot"><i class="bi bi-geo-alt"></i></div>
+        <div class="lbl">Field</div>
+        <div class="date">{{ v.field_verification_dates|default:"—" }}</div>
+      </div>
+      <div class="stage {% if v.documentation_review_dates %}{% if v.status == 'documentation_review' %}current{% else %}done{% endif %}{% else %}empty{% endif %}">
+        <div class="dot"><i class="bi bi-file-earmark-text"></i></div>
+        <div class="lbl">Docs</div>
+        <div class="date">{{ v.documentation_review_dates|default:"—" }}</div>
+      </div>
+      <div class="stage {% if v.validation_meeting_dates %}{% if v.status == 'validation_meeting' %}current{% else %}done{% endif %}{% else %}empty{% endif %}">
+        <div class="dot"><i class="bi bi-people"></i></div>
+        <div class="lbl">Validation</div>
+        <div class="date">{{ v.validation_meeting_dates|default:"—" }}</div>
+      </div>
+      <div class="stage {% if v.status == 'completed' %}done{% else %}empty{% endif %}">
+        <div class="dot"><i class="bi bi-check2-circle"></i></div>
+        <div class="lbl">Complete</div>
+        {% if v.verified_at %}
+          <div class="date">{{ v.verified_at|date:"d M" }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="meta-row">
+      {% if v.verification_period %}
+        <span><span class="lbl">Period:</span>{{ v.verification_period }}</span>
+      {% endif %}
+      {% if v.final_report_due %}
+        <span><span class="lbl">Report Due:</span>{{ v.final_report_due|date:"d M Y" }}</span>
+      {% endif %}
+      {% if v.verified_by %}
+        <span><span class="lbl">Verified By:</span>{{ v.verified_by.get_full_name|default:v.verified_by.email }}</span>
+      {% endif %}
+    </div>
+
+    {% if v.verification_notes %}
+      <div class="notes-box">
+        <i class="bi bi-sticky me-1"></i>{{ v.verification_notes }}
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% empty %}
+<div class="card">
+  <div class="empty-state">
+    <i class="bi bi-shield-check"></i>
+    <h6 style="font-weight:600;color:#1e293b;">No verifications yet</h6>
+    <p style="font-size:0.85rem;max-width:420px;margin:.5rem auto 1rem;">
+      Output verifications are created per project and reporting cycle.
+      They track field visits, documentation review, and validation meetings
+      before a report can be finalized.
+    </p>
+    <a href="{% url 'projects:tracker' %}?type=verification" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">
+      <i class="bi bi-table me-1"></i>Open Tracker
+    </a>
+  </div>
+</div>
+{% endfor %}
+
+<div id="noResults" class="card mt-3" style="display:none;">
+  <div class="empty-state" style="padding:1.5rem;">
+    <i class="bi bi-search" style="font-size:1.5rem;"></i>
+    <div style="font-size:0.85rem;">No verifications match your filters.</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const search = document.getElementById('verifSearch');
+const statusFilter = document.getElementById('statusFilter');
+const noResults = document.getElementById('noResults');
+
+function applyFilter() {
+  const q = (search.value || '').trim().toLowerCase();
+  const s = statusFilter.value;
+  let visible = 0;
+  document.querySelectorAll('.verification-card').forEach(el => {
+    const hay = el.dataset.search || '';
+    const matchesSearch = !q || hay.indexOf(q) !== -1;
+    const matchesStatus = !s || el.dataset.status === s;
+    const show = matchesSearch && matchesStatus;
+    el.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  const hasAny = document.querySelectorAll('.verification-card').length > 0;
+  noResults.style.display = (hasAny && visible === 0) ? '' : 'none';
+}
+
+search?.addEventListener('input', applyFilter);
+statusFilter?.addEventListener('change', applyFilter);
+</script>
+{% endblock %}

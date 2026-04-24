@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% block title %}Delegations  — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item active">Delegations</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-arrow-left-right me-2" style="color:var(--dodo-blue);"></i>Report Delegations</h1>
+    <p class="page-header-sub">Delegate report preparation to specific users for projects and cycles</p>
+  </div>
+  <a href="{% url 'notifications:delegate' %}" class="btn" style="background:var(--dodo-blue);color:#fff;border-radius:8px;">
+    <i class="bi bi-plus-lg me-1"></i>New Delegation
+  </a>
+</div>
+
+<ul class="nav nav-pills mb-3" style="gap:0.5rem;">
+  <li class="nav-item">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#received" style="border-radius:8px;font-size:0.85rem;">
+      <i class="bi bi-inbox me-1"></i>Received ({{ received|length }})
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#given" style="border-radius:8px;font-size:0.85rem;">
+      <i class="bi bi-send me-1"></i>Given ({{ given|length }})
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content">
+  <!-- Received -->
+  <div class="tab-pane fade show active" id="received">
+    <div class="card">
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th>Project</th><th>Cycle</th><th>Type</th><th>Delegated By</th>
+              <th>Period</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in received %}
+            <tr>
+              <td>
+                <a href="{% url 'projects:detail' d.project.pk %}" style="color:#1a202c;text-decoration:none;font-weight:500;font-size:0.85rem;">{{ d.project.display_title }}</a>
+              </td>
+              <td>{% if d.cycle %}<span class="badge bg-light text-dark">{{ d.cycle.year }} {{ d.cycle.quarter }}</span>{% else %}<span class="text-muted">Ongoing</span>{% endif %}</td>
+              <td><span class="badge" style="background:#eff6ff;color:#1e40af;font-size:0.72rem;">{{ d.get_delegation_type_display }}</span></td>
+              <td style="font-size:0.82rem;">{{ d.delegated_by.get_full_name }}</td>
+              <td style="font-size:0.78rem;">{{ d.start_date|date:"d M" }}{% if d.end_date %} – {{ d.end_date|date:"d M" }}{% endif %}</td>
+              <td>
+                {% if d.is_currently_active %}<span class="badge badge-active">Active</span>
+                {% else %}<span class="badge badge-closed">Inactive</span>{% endif %}
+              </td>
+              <td>
+                <a href="{% url 'projects:detail' d.project.pk %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:6px;font-size:0.75rem;">Open</a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-center py-4 text-muted">
+              <i class="bi bi-inbox fs-2 d-block mb-2" style="color:#cbd5e1;"></i>
+              No delegations received
+            </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Given -->
+  <div class="tab-pane fade" id="given">
+    <div class="card">
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th>Project</th><th>Cycle</th><th>Delegated To</th><th>Type</th>
+              <th>Period</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in given %}
+            <tr>
+              <td><span style="font-weight:500;font-size:0.85rem;">{{ d.project.display_title }}</span></td>
+              <td>{% if d.cycle %}<span class="badge bg-light text-dark">{{ d.cycle.year }} {{ d.cycle.quarter }}</span>{% else %}<span class="text-muted">Ongoing</span>{% endif %}</td>
+              <td style="font-size:0.82rem;">{{ d.delegated_to.get_full_name }}<br><small class="text-muted">{{ d.delegated_to.email }}</small></td>
+              <td><span class="badge" style="background:#eff6ff;color:#1e40af;font-size:0.72rem;">{{ d.get_delegation_type_display }}</span></td>
+              <td style="font-size:0.78rem;">{{ d.start_date|date:"d M" }}{% if d.end_date %} – {{ d.end_date|date:"d M" }}{% endif %}</td>
+              <td>
+                {% if d.is_currently_active %}<span class="badge badge-active">Active</span>
+                {% else %}<span class="badge badge-closed">Inactive</span>{% endif %}
+              </td>
+              <td>
+                {% if d.is_active %}
+                <form method="post" action="{% url 'notifications:revoke_delegation' d.pk %}" style="margin:0;" onsubmit="return confirm('Revoke this delegation?')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger" style="border-radius:6px;font-size:0.72rem;">Revoke</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-center py-4 text-muted">
+              <i class="bi bi-send fs-2 d-block mb-2" style="color:#cbd5e1;"></i>
+              No delegations given
+            </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

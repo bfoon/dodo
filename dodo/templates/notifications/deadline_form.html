@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% block title %}Edit Deadline  — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'notifications:deadlines' %}" style="color:var(--dodo-blue);text-decoration:none;">Deadlines</a></li>
+<li class="breadcrumb-item active">Edit</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-alarm me-2" style="color:var(--dodo-blue);"></i>Edit Deadline Schedule</h1>
+    <p class="page-header-sub">
+      {{ deadline.project.display_title }} — {{ deadline.cycle.year }} {{ deadline.cycle.quarter }} ({{ deadline.cycle.get_cycle_type_display }})
+    </p>
+  </div>
+</div>
+
+<form method="post" action="{% url 'notifications:deadline_edit' deadline.pk %}">
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0" style="font-weight:600;">Submission Timeline Dates</h6>
+          <small class="text-muted">Override the template dates for this specific project/cycle</small>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Internal Draft Deadline</label>
+              <input type="date" name="internal_draft_deadline" class="form-control"
+                     value="{{ deadline.internal_draft_deadline|date:'Y-m-d' }}" style="border-radius:8px;">
+              {% if deadline.internal_draft_completed_at %}<small class="text-success" style="font-size:0.72rem;">✓ Completed {{ deadline.internal_draft_completed_at|date:"d M H:i" }}</small>{% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">Programme Review Deadline</label>
+              <input type="date" name="programme_review_deadline" class="form-control"
+                     value="{{ deadline.programme_review_deadline|date:'Y-m-d' }}" style="border-radius:8px;">
+              {% if deadline.programme_review_completed_at %}<small class="text-success" style="font-size:0.72rem;">✓ Completed {{ deadline.programme_review_completed_at|date:"d M H:i" }}</small>{% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">PMSU Review Deadline</label>
+              <input type="date" name="pmsu_review_deadline" class="form-control"
+                     value="{{ deadline.pmsu_review_deadline|date:'Y-m-d' }}" style="border-radius:8px;">
+              {% if deadline.pmsu_review_completed_at %}<small class="text-success" style="font-size:0.72rem;">✓ Completed {{ deadline.pmsu_review_completed_at|date:"d M H:i" }}</small>{% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" style="font-size:0.82rem;font-weight:600;">DRR/RR Clearance Deadline</label>
+              <input type="date" name="final_clearance_deadline" class="form-control"
+                     value="{{ deadline.final_clearance_deadline|date:'Y-m-d' }}" style="border-radius:8px;">
+              {% if deadline.final_clearance_completed_at %}<small class="text-success" style="font-size:0.72rem;">✓ Completed {{ deadline.final_clearance_completed_at|date:"d M H:i" }}</small>{% endif %}
+            </div>
+            <div class="col-12">
+              <label class="form-label" style="font-size:0.82rem;font-weight:700;color:var(--dodo-red);">Final Submission Deadline <span class="text-danger">*</span></label>
+              <input type="date" name="final_submission_deadline" class="form-control form-control-lg" required
+                     value="{{ deadline.final_submission_deadline|date:'Y-m-d' }}"
+                     style="border-radius:8px;border:2px solid var(--dodo-red);">
+              {% if deadline.final_submission_completed_at %}<small class="text-success" style="font-size:0.72rem;">✓ Submitted {{ deadline.final_submission_completed_at|date:"d M H:i" }}</small>{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0" style="font-weight:600;">Reminder Overrides</h6>
+        </div>
+        <div class="card-body">
+          <label class="form-label" style="font-size:0.82rem;font-weight:600;">Override reminder days</label>
+          <input type="text" name="override_reminder_days" class="form-control"
+                 value="{{ deadline.override_reminder_days|default:'' }}"
+                 placeholder="Leave blank to use template default ({{ deadline.template.reminder_days_before|default:'14,7,3,1' }})"
+                 style="border-radius:8px;">
+          <small class="text-muted" style="font-size:0.75rem;">Comma-separated days before final deadline. Leave blank to inherit from template.</small>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0" style="font-weight:600;">Notes</h6>
+        </div>
+        <div class="card-body">
+          <textarea name="notes" class="form-control" rows="3"
+                    placeholder="Any notes about this deadline..."
+                    style="border-radius:8px;">{{ deadline.notes }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0" style="font-weight:600;">Current Status</h6>
+        </div>
+        <div class="card-body">
+          <div class="text-center mb-3">
+            {% if deadline.status == 'completed' %}<span class="badge badge-submitted" style="font-size:0.85rem;padding:8px 16px;">✓ Completed</span>
+            {% elif deadline.status == 'overdue' %}<span class="badge badge-overdue" style="font-size:0.85rem;padding:8px 16px;">⚠ Overdue</span>
+            {% elif deadline.status == 'at_risk' %}<span class="badge badge-pending" style="font-size:0.85rem;padding:8px 16px;">At Risk</span>
+            {% else %}<span class="badge badge-not_started" style="font-size:0.85rem;padding:8px 16px;">{{ deadline.get_status_display }}</span>{% endif %}
+          </div>
+          <div style="font-size:0.82rem;color:#475569;">
+            <div class="mb-2"><strong>Current Stage:</strong> {{ deadline.get_current_stage.1 }}</div>
+            <div class="mb-2"><strong>Days Until Deadline:</strong> {{ deadline.get_days_until_deadline }}</div>
+            {% if deadline.template %}<div class="mb-2"><strong>Template:</strong> {{ deadline.template.name }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn w-100 mb-2" style="background:var(--dodo-blue);color:#fff;border-radius:8px;padding:0.6rem;font-weight:600;">
+        <i class="bi bi-check-lg me-1"></i>Save Changes
+      </button>
+      <a href="{% url 'notifications:deadlines' %}" class="btn btn-outline-secondary w-100" style="border-radius:8px;">Cancel</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

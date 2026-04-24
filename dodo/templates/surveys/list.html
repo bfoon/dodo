@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+{% block title %}Surveys — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Home</a></li>
+<li class="breadcrumb-item active">Surveys</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.filter-bar { background:#fff; border-radius:12px; border:1px solid #e2e8f0; padding:.75rem 1rem; margin-bottom:1rem; }
+.survey-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.1rem; height:100%; transition:all .15s ease; display:flex; flex-direction:column; position:relative; }
+.survey-card:hover { border-color:var(--dodo-blue); box-shadow:0 4px 14px rgba(0,119,200,0.08); transform:translateY(-1px); }
+.survey-card .status-stripe { position:absolute; top:0; left:0; right:0; height:3px; border-radius:12px 12px 0 0; }
+.survey-card.status-active .status-stripe { background:#16a34a; }
+.survey-card.status-draft .status-stripe { background:#94a3b8; }
+.survey-card.status-closed .status-stripe { background:#64748b; }
+.survey-card.status-paused .status-stripe { background:#f59e0b; }
+.survey-card.status-archived .status-stripe { background:#cbd5e1; }
+.survey-card h6 { font-weight:600; font-size:0.95rem; color:#0f172a; line-height:1.35; margin-bottom:.5rem; }
+.survey-card h6 a { color:inherit; text-decoration:none; }
+.survey-card h6 a:hover { color:var(--dodo-blue); }
+.survey-card .desc { font-size:0.8rem; color:#64748b; line-height:1.45; margin-bottom:.75rem; flex-grow:1; }
+.survey-card .meta-row { display:flex; gap:.75rem; align-items:center; font-size:0.74rem; color:#64748b; margin-bottom:.25rem; flex-wrap:wrap; }
+.survey-card .stats-row { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; margin-top:.75rem; padding-top:.75rem; border-top:1px solid #f1f5f9; }
+.survey-card .stat { text-align:center; }
+.survey-card .stat .val { font-size:1.1rem; font-weight:700; color:#0f172a; line-height:1; }
+.survey-card .stat .lbl { font-size:0.66rem; text-transform:uppercase; letter-spacing:.03em; color:#94a3b8; font-weight:600; margin-top:.15rem; }
+.survey-card .actions { display:flex; gap:.35rem; margin-top:.75rem; padding-top:.75rem; border-top:1px solid #f1f5f9; }
+.type-chip { font-size:0.68rem; padding:.2rem .5rem; border-radius:4px; background:rgba(0,119,200,0.1); color:var(--dodo-blue); font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
+.empty-state { padding:3rem 1rem; text-align:center; color:#64748b; }
+.empty-state i { font-size:2.5rem; color:#cbd5e1; display:block; margin-bottom:.5rem; }
+.status-chips { display:flex; gap:.4rem; flex-wrap:wrap; }
+.status-chip { font-size:0.76rem; padding:.3rem .6rem; border-radius:20px; border:1.5px solid #e2e8f0; color:#475569; background:#fff; cursor:pointer; text-decoration:none; font-weight:500; transition:all .12s; }
+.status-chip:hover { border-color:#cbd5e1; }
+.status-chip.active { background:var(--dodo-blue); color:#fff; border-color:var(--dodo-blue); }
+.status-chip .count { margin-left:.3rem; opacity:.7; font-size:0.7rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-ui-checks-grid me-2" style="color:var(--dodo-blue);"></i>Surveys</h1>
+    <p class="page-header-sub">Dynamic surveys, questionnaires, and data collection forms</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'surveys:create' %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-plus-lg me-1"></i>New Survey
+    </a>
+  </div>
+</div>
+
+<!-- Status chips -->
+<div class="status-chips mb-3">
+  <a href="{% url 'surveys:list' %}" class="status-chip {% if not status_filter %}active{% endif %}">
+    All<span class="count">{{ total_count|default:0 }}</span>
+  </a>
+  {% for sc, sl, cnt in status_breakdown %}
+    <a href="?status={{ sc }}" class="status-chip {% if status_filter == sc %}active{% endif %}">
+      {{ sl }}<span class="count">{{ cnt }}</span>
+    </a>
+  {% endfor %}
+</div>
+
+<!-- Search + filter -->
+<div class="filter-bar d-flex gap-3 align-items-center flex-wrap">
+  <input type="search" id="surveySearch" class="form-control form-control-sm"
+         placeholder="Search title or description…"
+         style="max-width:340px;border-radius:7px;font-size:0.85rem;">
+
+  <select id="typeFilter" class="form-select form-select-sm" style="max-width:200px;border-radius:7px;font-size:0.82rem;">
+    <option value="">All types</option>
+    {% for tc, tl in type_choices %}
+      <option value="{{ tc }}">{{ tl }}</option>
+    {% endfor %}
+  </select>
+
+  <div class="ms-auto" style="font-size:0.78rem;color:#64748b;">
+    <i class="bi bi-list-ul me-1"></i><span id="surveyCount">{{ surveys|length }}</span> survey{{ surveys|length|pluralize }}
+  </div>
+</div>
+
+<div class="row g-3" id="surveyGrid">
+  {% for s in surveys %}
+  <div class="col-md-6 col-xl-4 survey-item"
+       data-search="{{ s.title|lower }} {{ s.description|lower }}"
+       data-status="{{ s.status }}"
+       data-type="{{ s.survey_type }}">
+    <div class="survey-card status-{{ s.status }}">
+      <div class="status-stripe"></div>
+
+      <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
+        <span class="type-chip">{{ s.get_survey_type_display }}</span>
+        {% if s.status == 'active' %}<span class="badge badge-active" style="font-size:0.7rem;">Active</span>
+        {% elif s.status == 'draft' %}<span class="badge badge-not_started" style="font-size:0.7rem;">Draft</span>
+        {% elif s.status == 'closed' %}<span class="badge badge-closed" style="font-size:0.7rem;">Closed</span>
+        {% elif s.status == 'paused' %}<span class="badge bg-warning text-dark" style="font-size:0.7rem;">Paused</span>
+        {% else %}<span class="badge bg-secondary" style="font-size:0.7rem;">{{ s.get_status_display }}</span>{% endif %}
+        {% if s.is_anonymous %}
+          <span class="badge bg-light text-dark" style="font-size:0.68rem;"><i class="bi bi-eye-slash me-1"></i>Anon</span>
+        {% endif %}
+      </div>
+
+      <h6><a href="{% url 'surveys:detail' s.pk %}">{{ s.title }}</a></h6>
+
+      {% if s.description %}
+        <div class="desc">{{ s.description|truncatechars:140 }}</div>
+      {% else %}
+        <div class="desc" style="color:#cbd5e1;font-style:italic;">No description</div>
+      {% endif %}
+
+      <div class="meta-row">
+        {% if s.project %}
+          <span>
+            <i class="bi bi-folder me-1" style="color:#94a3b8;"></i>
+            <a href="{% url 'projects:detail' s.project.pk %}" style="color:#64748b;text-decoration:none;">
+              {{ s.project.display_title|truncatechars:30 }}
+            </a>
+          </span>
+        {% endif %}
+        <span style="color:#94a3b8;">
+          <i class="bi bi-calendar3 me-1"></i>{{ s.created_at|date:"d M Y" }}
+        </span>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat">
+          <div class="val">{{ s.questions.count }}</div>
+          <div class="lbl">Questions</div>
+        </div>
+        <div class="stat">
+          <div class="val">{{ s.get_response_count }}</div>
+          <div class="lbl">Responses</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <a href="{% url 'surveys:builder' s.pk %}" class="btn btn-sm flex-grow-1" style="background:var(--dodo-blue);color:#fff;border-radius:7px;font-size:0.76rem;">
+          <i class="bi bi-pencil-square me-1"></i>Builder
+        </a>
+        {% if s.status == 'active' %}
+          <a href="{% url 'surveys:respond' s.pk %}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success" style="border-radius:7px;font-size:0.76rem;" title="Open public form">
+            <i class="bi bi-box-arrow-up-right"></i>
+          </a>
+        {% endif %}
+        <a href="{% url 'surveys:results' s.pk %}" class="btn btn-sm btn-outline-secondary" style="border-radius:7px;font-size:0.76rem;" title="View results">
+          <i class="bi bi-bar-chart"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="col-12">
+    <div class="card">
+      <div class="empty-state">
+        <i class="bi bi-ui-checks-grid"></i>
+        <h6 style="font-weight:600;color:#1e293b;">No surveys yet</h6>
+        <p style="font-size:0.85rem;max-width:400px;margin:.5rem auto 1rem;">
+          Create dynamic surveys for baseline assessments, monitoring, output verification,
+          or any other data collection need.
+        </p>
+        <a href="{% url 'surveys:create' %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;">
+          <i class="bi bi-plus-lg me-1"></i>Create First Survey
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div id="noResults" class="card mt-3" style="display:none;">
+  <div class="empty-state" style="padding:1.5rem;">
+    <i class="bi bi-search" style="font-size:1.5rem;"></i>
+    <div style="font-size:0.85rem;">No surveys match your filters.</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const search = document.getElementById('surveySearch');
+const typeFilter = document.getElementById('typeFilter');
+const noResults = document.getElementById('noResults');
+const count = document.getElementById('surveyCount');
+
+function applyFilter() {
+  const q = (search.value || '').trim().toLowerCase();
+  const t = typeFilter.value;
+  let visible = 0;
+  document.querySelectorAll('.survey-item').forEach(el => {
+    const hay = el.dataset.search || '';
+    const matchesSearch = !q || hay.indexOf(q) !== -1;
+    const matchesType = !t || el.dataset.type === t;
+    const show = matchesSearch && matchesType;
+    el.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  count.textContent = visible;
+  const hasAny = document.querySelectorAll('.survey-item').length > 0;
+  noResults.style.display = (hasAny && visible === 0) ? '' : 'none';
+}
+
+search?.addEventListener('input', applyFilter);
+typeFilter?.addEventListener('change', applyFilter);
+</script>
+{% endblock %}

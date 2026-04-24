@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}Deadline Templates  — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item active">Deadline Templates</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-clock-history me-2" style="color:var(--dodo-blue);"></i>Deadline Templates</h1>
+    <p class="page-header-sub">Configurable submission timelines with automatic reminders for {{ active_country_office.name }}</p>
+  </div>
+  <a href="{% url 'notifications:template_create' %}" class="btn" style="background:var(--dodo-blue);color:#fff;border-radius:8px;">
+    <i class="bi bi-plus-lg me-1"></i>New Template
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead style="background:#f8fafc;">
+        <tr>
+          <th>Template Name</th>
+          <th>Type</th>
+          <th>Timeline (days before)</th>
+          <th>Reminders</th>
+          <th>Channels</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in templates %}
+        <tr>
+          <td>
+            <div style="font-weight:600;color:#1a202c;font-size:0.88rem;">{{ t.name }}</div>
+            {% if t.description %}<div style="font-size:0.75rem;color:#64748b;">{{ t.description|truncatechars:80 }}</div>{% endif %}
+          </td>
+          <td><span class="badge bg-light text-dark" style="font-size:0.72rem;">{{ t.get_cycle_type_display }}</span></td>
+          <td style="font-size:0.78rem;color:#475569;">
+            Draft: <strong>{{ t.internal_draft_days_before }}d</strong> ·
+            Prog: <strong>{{ t.programme_review_days_before }}d</strong> ·
+            PMSU: <strong>{{ t.pmsu_review_days_before }}d</strong> ·
+            Clr: <strong>{{ t.final_clearance_days_before }}d</strong>
+          </td>
+          <td>
+            {% for d in t.get_reminder_days %}
+            <span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:0.7rem;">{{ d }}d</span>
+            {% endfor %}
+          </td>
+          <td>
+            {% if t.send_in_app %}<span class="badge" style="background:#f0fdf4;color:#166534;font-size:0.7rem;" title="In-app"><i class="bi bi-app"></i></span>{% endif %}
+            {% if t.send_email %}<span class="badge" style="background:#eff6ff;color:#1e40af;font-size:0.7rem;" title="Email"><i class="bi bi-envelope"></i></span>{% endif %}
+            {% if t.notify_head_of_unit %}<span class="badge" style="background:#fef3c7;color:#92400e;font-size:0.7rem;" title="Head of Unit"><i class="bi bi-person-badge"></i></span>{% endif %}
+          </td>
+          <td>
+            <a href="{% url 'notifications:template_edit' t.pk %}" class="btn btn-sm btn-outline-primary" style="border-radius:6px;font-size:0.75rem;">
+              <i class="bi bi-pencil"></i> Edit
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center py-5">
+          <i class="bi bi-clock-history fs-2 d-block mb-2" style="color:#cbd5e1;"></i>
+          <div class="text-muted">No deadline templates yet</div>
+          <a href="{% url 'notifications:template_create' %}" class="btn btn-sm mt-2" style="background:var(--dodo-blue);color:#fff;">Create the first template</a>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

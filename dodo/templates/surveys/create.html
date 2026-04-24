@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+{% block title %}New Survey — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'surveys:list' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Surveys</a></li>
+<li class="breadcrumb-item active">New</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-section { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.25rem 1.5rem; margin-bottom:1rem; }
+.form-section-title { font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--dodo-blue); margin-bottom:1rem; display:flex; align-items:center; gap:.5rem; }
+.form-section-title .num { width:22px; height:22px; border-radius:50%; background:var(--dodo-blue); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:0.72rem; }
+.field-label { font-size:0.78rem; font-weight:600; color:#374151; margin-bottom:.3rem; }
+.field-label .req { color:#dc2626; }
+.field-hint { font-size:0.72rem; color:#94a3b8; margin-top:.2rem; }
+.form-control, .form-select { font-size:0.87rem; border-radius:8px; border-color:#e2e8f0; }
+.form-control:focus, .form-select:focus { border-color:var(--dodo-blue); box-shadow:0 0 0 3px rgba(0,119,200,0.12); }
+textarea.form-control { min-height:90px; }
+
+.type-tile { cursor:pointer; padding:.75rem .85rem; border:1.5px solid #e2e8f0; border-radius:10px; background:#fff; transition:all .12s; text-align:center; display:block; }
+.type-tile input { display:none; }
+.type-tile:hover { border-color:#cbd5e1; }
+.type-tile.selected { border-color:var(--dodo-blue); background:rgba(0,119,200,0.06); }
+.type-tile .ico { width:36px; height:36px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; font-size:1rem; margin-bottom:.4rem; background:rgba(0,119,200,0.12); color:var(--dodo-blue); }
+.type-tile .name { font-weight:600; font-size:0.8rem; color:#0f172a; }
+.type-tile .desc { font-size:0.7rem; color:#64748b; margin-top:.1rem; }
+
+.toggle-box { display:flex; gap:.75rem; align-items:flex-start; padding:.85rem; border:1px solid #e2e8f0; border-radius:10px; background:#fafbfc; }
+.toggle-box:hover { border-color:#cbd5e1; background:#fff; }
+.toggle-box label { font-size:0.86rem; font-weight:600; color:#0f172a; cursor:pointer; margin-bottom:.15rem; }
+.toggle-box .desc { font-size:0.76rem; color:#64748b; line-height:1.4; }
+.toggle-box input { margin-top:.2rem; flex-shrink:0; cursor:pointer; transform:scale(1.15); }
+
+.sticky-actions { position:sticky; bottom:0; background:#fff; border-top:1px solid #e2e8f0; padding:.75rem 1rem; margin:0 -15px; z-index:10; border-radius:0 0 12px 12px; box-shadow:0 -4px 12px rgba(0,0,0,0.04); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-plus-square me-2" style="color:var(--dodo-blue);"></i>New Survey</h1>
+    <p class="page-header-sub">Create a survey shell — you'll add questions in the next step</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'surveys:list' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">
+      <i class="bi bi-x-lg me-1"></i>Cancel
+    </a>
+  </div>
+</div>
+
+{% if messages %}
+  {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show" style="border-radius:10px;font-size:0.85rem;">
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<form method="post" id="surveyCreateForm" action="{% url 'surveys:create' %}">
+  {% csrf_token %}
+
+  <div class="row">
+    <div class="col-lg-8">
+      <!-- 1. Basics -->
+      <div class="form-section">
+        <div class="form-section-title"><span class="num">1</span>Survey Basics</div>
+
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="field-label">Title <span class="req">*</span></label>
+            <input type="text" name="title" class="form-control" required maxlength="300"
+                   placeholder="e.g. Baseline Assessment — Youth Empowerment Programme">
+          </div>
+
+          <div class="col-12">
+            <label class="field-label">Description</label>
+            <textarea name="description" class="form-control"
+                      placeholder="Brief description of the survey's purpose and audience"></textarea>
+            <div class="field-hint">Shown on the survey list and on the respondent's landing page</div>
+          </div>
+
+          <div class="col-12">
+            <label class="field-label">Instructions to Respondents</label>
+            <textarea name="instructions" class="form-control"
+                      placeholder="How should respondents complete this survey? Any context they need?"></textarea>
+            <div class="field-hint">Displayed above the questions on the respondent form</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Type -->
+      <div class="form-section">
+        <div class="form-section-title"><span class="num">2</span>Survey Type</div>
+        <div class="row g-2">
+          {% for tc, tl in survey_types %}
+          <div class="col-6 col-md-4 col-lg-3">
+            <label class="type-tile {% if tc == 'quick' %}selected{% endif %}">
+              <input type="radio" name="survey_type" value="{{ tc }}" {% if tc == 'quick' %}checked{% endif %}>
+              <div class="ico">
+                {% if tc == 'baseline' %}<i class="bi bi-play-circle"></i>
+                {% elif tc == 'midterm' %}<i class="bi bi-bar-chart-steps"></i>
+                {% elif tc == 'endline' %}<i class="bi bi-flag"></i>
+                {% elif tc == 'monitoring' %}<i class="bi bi-compass"></i>
+                {% elif tc == 'quick' %}<i class="bi bi-lightning"></i>
+                {% elif tc == 'verification' %}<i class="bi bi-shield-check"></i>
+                {% else %}<i class="bi bi-sliders"></i>{% endif %}
+              </div>
+              <div class="name">{{ tl }}</div>
+            </label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- 3. Project link -->
+      <div class="form-section">
+        <div class="form-section-title"><span class="num">3</span>Project Association</div>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="field-label">Link to Project (optional)</label>
+            <select name="project" class="form-select">
+              <option value="">— None —</option>
+              {% for p in projects %}
+                <option value="{{ p.pk }}">
+                  {% if p.pims_id %}[{{ p.pims_id }}] {% endif %}{{ p.display_title }}
+                </option>
+              {% endfor %}
+            </select>
+            <div class="field-hint">Survey results can be viewed in the project's detail page when linked</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Settings -->
+      <div class="form-section">
+        <div class="form-section-title"><span class="num">4</span>Privacy & Settings</div>
+
+        <div class="row g-3">
+          <div class="col-12">
+            <div class="toggle-box">
+              <input type="checkbox" name="is_anonymous" id="is_anonymous" value="1">
+              <div>
+                <label for="is_anonymous">Anonymous responses</label>
+                <div class="desc">Respondent names and emails won't be collected or stored. Use this for sensitive topics or broader community feedback.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="form-section" style="position:sticky;top:1rem;">
+        <div class="form-section-title"><i class="bi bi-info-circle" style="color:var(--dodo-blue);"></i>What happens next?</div>
+        <ol style="font-size:0.82rem;color:#475569;padding-left:1.25rem;line-height:1.6;">
+          <li class="mb-2">You'll land in the <strong>Survey Builder</strong> where you can add questions of 14+ types.</li>
+          <li class="mb-2">Choose question types: text, number, radio, checkbox, Likert, rating, date, file upload, and more.</li>
+          <li class="mb-2">Set which questions are required and add help text.</li>
+          <li class="mb-2">When ready, <strong>publish</strong> the survey to make it live and shareable.</li>
+          <li>Share the public link. View aggregated results anytime.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <div class="sticky-actions d-flex justify-content-between align-items-center gap-2">
+    <div style="font-size:0.78rem;color:#94a3b8;">
+      <i class="bi bi-shield-check me-1"></i>
+      The survey is saved as <strong>Draft</strong> — it won't accept responses until you publish it.
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'surveys:list' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">Cancel</a>
+      <button type="submit" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;padding:.4rem 1.2rem;">
+        <i class="bi bi-arrow-right me-1"></i>Create & Continue to Builder
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Type tile selection
+document.querySelectorAll('.type-tile').forEach(label => {
+  label.addEventListener('click', function() {
+    document.querySelectorAll('.type-tile').forEach(l => l.classList.remove('selected'));
+    this.classList.add('selected');
+    const radio = this.querySelector('input');
+    if (radio) radio.checked = true;
+  });
+});
+</script>
+{% endblock %}

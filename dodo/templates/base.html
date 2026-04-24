@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Dodo — M&E Platform{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --dodo-blue: #0077c8;
+      --dodo-blue-dark: #005a9e;
+      --dodo-blue-light: #e8f4fd;
+      --dodo-red: #ee2a24;
+      --dodo-cyan: #00b5e2;
+      --dodo-green: #009e60;
+      --sidebar-width: 260px;
+      --topbar-height: 60px;
+    }
+    * { font-family: 'Inter', sans-serif; }
+    body { background: #f0f4f8; min-height: 100vh; }
+
+    /* Sidebar */
+    .sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-width);
+      background: linear-gradient(180deg, #003f7d 0%, #005a9e 40%, #0077c8 100%);
+      z-index: 1040; overflow-y: auto; overflow-x: hidden;
+      transition: transform 0.3s ease;
+    }
+    .sidebar-brand {
+      padding: 0 1.25rem;
+      height: var(--topbar-height);
+      display: flex; align-items: center; gap: 0.75rem;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+    }
+    .sidebar-brand img { height: 28px; }
+    .sidebar-brand-text { color: #fff; font-weight: 700; font-size: 0.9rem; line-height: 1.2; }
+    .sidebar-brand-sub { color: rgba(255,255,255,0.6); font-size: 0.7rem; font-weight: 400; }
+
+    .sidebar-section-label {
+      color: rgba(255,255,255,0.45); font-size: 0.65rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      padding: 0.75rem 1.25rem 0.25rem;
+    }
+    .nav-link-sidebar {
+      display: flex; align-items: center; gap: 0.65rem;
+      color: rgba(255,255,255,0.75); padding: 0.55rem 1.25rem;
+      border-radius: 0; text-decoration: none; font-size: 0.85rem; font-weight: 500;
+      transition: all 0.15s; position: relative; white-space: nowrap;
+    }
+    .nav-link-sidebar:hover { color: #fff; background: rgba(255,255,255,0.1); }
+    .nav-link-sidebar.active {
+      color: #fff; background: rgba(255,255,255,0.15);
+      border-left: 3px solid var(--dodo-cyan);
+    }
+    .nav-link-sidebar i { font-size: 1rem; width: 1.2rem; text-align: center; flex-shrink: 0; }
+
+    .sidebar-co-selector {
+      margin: 0.75rem 1rem;
+      background: rgba(0,0,0,0.2); border-radius: 8px; padding: 0.5rem 0.75rem;
+      color: rgba(255,255,255,0.85); font-size: 0.8rem;
+    }
+    .sidebar-co-selector select {
+      background: transparent; border: none; color: #fff; font-size: 0.8rem;
+      width: 100%; outline: none; cursor: pointer;
+    }
+    .sidebar-co-selector select option { background: #003f7d; color: #fff; }
+
+    /* Topbar */
+    .topbar {
+      position: fixed; top: 0; left: var(--sidebar-width); right: 0;
+      height: var(--topbar-height); background: #fff;
+      border-bottom: 1px solid #e2e8f0; z-index: 1030;
+      display: flex; align-items: center; padding: 0 1.5rem;
+      gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .topbar-breadcrumb { flex: 1; display: flex; align-items: center; gap: 0.5rem; }
+    .topbar-breadcrumb .breadcrumb { margin: 0; font-size: 0.82rem; }
+
+    /* Main content */
+    .main-content {
+      margin-left: var(--sidebar-width);
+      padding-top: var(--topbar-height);
+      min-height: 100vh;
+    }
+    .content-area { padding: 1.75rem; }
+
+    /* Page header */
+    .page-header {
+      margin-bottom: 1.5rem;
+      display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+    }
+    .page-header-title { font-size: 1.4rem; font-weight: 700; color: #1a202c; margin: 0; }
+    .page-header-sub { color: #64748b; font-size: 0.85rem; margin-top: 0.25rem; }
+
+    /* Cards */
+    .card { border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .card-header { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 1rem 1.25rem; }
+    .stat-card { border-radius: 12px; padding: 1.25rem; color: #fff; position: relative; overflow: hidden; }
+    .stat-card::after {
+      content: ''; position: absolute; right: -20px; top: -20px;
+      width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.1);
+    }
+    .stat-card .stat-icon { font-size: 2rem; opacity: 0.85; }
+    .stat-card .stat-value { font-size: 2rem; font-weight: 700; line-height: 1; }
+    .stat-card .stat-label { font-size: 0.8rem; opacity: 0.85; margin-top: 0.25rem; }
+
+    /* Status badges */
+    .badge-submitted { background: #dcfce7; color: #166534; }
+    .badge-pending { background: #fef9c3; color: #854d0e; }
+    .badge-under_review { background: #dbeafe; color: #1e40af; }
+    .badge-overdue { background: #fee2e2; color: #991b1b; }
+    .badge-not_started { background: #f1f5f9; color: #475569; }
+    .badge-not_applicable { background: #f8fafc; color: #94a3b8; border: 1px solid #e2e8f0; }
+    .badge-closed { background: #1e293b; color: #fff; }
+    .badge-active { background: #dcfce7; color: #166534; }
+    .badge-ending { background: #fef3c7; color: #92400e; }
+    .badge-pipeline { background: #e0f2fe; color: #075985; }
+
+    /* Tracker table */
+    .tracker-table th, .tracker-table td { padding: 0.5rem 0.75rem; font-size: 0.82rem; vertical-align: middle; }
+    .tracker-table .project-cell { max-width: 220px; }
+    .tracker-table .project-name { font-weight: 500; color: #1a202c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; max-width: 220px; }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.72rem; font-weight: 500; white-space: nowrap;
+    }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Survey builder */
+    .question-card { border: 2px solid #e2e8f0; border-radius: 10px; transition: border-color 0.2s; }
+    .question-card:hover { border-color: var(--dodo-blue); }
+    .question-type-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.5rem; }
+    .question-type-btn { padding: 0.5rem; text-align: center; cursor: pointer; border: 2px solid #e2e8f0; border-radius: 8px; transition: all 0.15s; font-size: 0.78rem; }
+    .question-type-btn:hover, .question-type-btn.selected { border-color: var(--dodo-blue); background: var(--dodo-blue-light); color: var(--dodo-blue); }
+
+    /* Progress bar */
+    .progress { height: 6px; border-radius: 3px; }
+
+    /* Table enhancements */
+    .table-hover tbody tr:hover { background: #f8fafc; }
+    .table th { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; }
+
+    /* Charts placeholder */
+    .chart-container { position: relative; height: 280px; }
+
+    /* Notifications/alerts */
+    .alert { border-radius: 10px; border: none; }
+    .alert-success { background: #f0fdf4; color: #166534; }
+    .alert-danger { background: #fef2f2; color: #991b1b; }
+    .alert-warning { background: #fffbeb; color: #92400e; }
+    .alert-info { background: #eff6ff; color: #1e40af; }
+
+    /* Responsive */
+    @media (max-width: 991px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+      .main-content, .topbar { margin-left: 0; left: 0; }
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Animations */
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+{% if user.is_authenticated %}
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style="flex-shrink:0;">
+      <circle cx="16" cy="16" r="16" fill="#0077c8"/>
+      <text x="16" y="21" text-anchor="middle" fill="white" font-size="13" font-weight="700" font-family="Inter,Arial" letter-spacing="-0.5">do</text>
+    </svg>
+    <div>
+      <div class="sidebar-brand-text">Dodo</div>
+      <div class="sidebar-brand-sub">M&amp;E Platform</div>
+    </div>
+  </div>
+
+  {% if accessible_country_offices %}
+  <div class="sidebar-co-selector">
+    <div style="color:rgba(255,255,255,0.5);font-size:0.65rem;margin-bottom:2px;">COUNTRY OFFICE</div>
+    <form method="post" id="co-switcher">{% csrf_token %}
+      <select name="co_id" onchange="switchOffice(this.value)">
+        {% for co in accessible_country_offices %}
+        <option value="{{ co.pk }}" {% if active_country_office.pk == co.pk %}selected{% endif %}>
+          {{ co.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="sidebar-section-label">Main</div>
+  <a href="{% url 'dashboard:home' %}" class="nav-link-sidebar {% if request.resolver_match.namespace == 'dashboard' %}active{% endif %}">
+    <i class="bi bi-grid-1x2-fill"></i> Dashboard
+  </a>
+
+  <div class="sidebar-section-label">Programme</div>
+  <a href="{% url 'projects:list' %}" class="nav-link-sidebar {% if request.resolver_match.namespace == 'projects' and request.resolver_match.url_name == 'list' %}active{% endif %}">
+    <i class="bi bi-folder2-open"></i> Projects
+  </a>
+  <a href="{% url 'projects:tracker' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'tracker' %}active{% endif %}">
+    <i class="bi bi-table"></i> Reporting Tracker
+  </a>
+  <a href="{% url 'projects:cpd' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'cpd' %}active{% endif %}">
+    <i class="bi bi-diagram-3"></i> CPD Framework
+  </a>
+  <a href="{% url 'projects:donor_timelines' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'donor_timelines' %}active{% endif %}">
+    <i class="bi bi-calendar3"></i> Donor Timelines
+  </a>
+
+  <div class="sidebar-section-label">Monitoring</div>
+  <a href="{% url 'monitoring:indicators' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'indicators' %}active{% endif %}">
+    <i class="bi bi-graph-up-arrow"></i> Indicators
+  </a>
+  <a href="{% url 'monitoring:verification' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'verification' %}active{% endif %}">
+    <i class="bi bi-patch-check"></i> Output Verification
+  </a>
+  <a href="{% url 'monitoring:visits' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'visits' %}active{% endif %}">
+    <i class="bi bi-compass"></i> Field Visits
+  </a>
+
+  <div class="sidebar-section-label">Data Collection</div>
+  <a href="{% url 'surveys:list' %}" class="nav-link-sidebar {% if request.resolver_match.namespace == 'surveys' %}active{% endif %}">
+    <i class="bi bi-ui-checks-grid"></i> Surveys
+  </a>
+
+  <div class="sidebar-section-label">Reporting</div>
+  <a href="{% url 'reporting:progress' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'progress' %}active{% endif %}">
+    <i class="bi bi-file-earmark-bar-graph"></i> Progress Reports
+  </a>
+  <a href="{% url 'reporting:indicators' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'indicators' %}active{% endif %}">
+    <i class="bi bi-bar-chart-line"></i> Indicator Reports
+  </a>
+  <a href="{% url 'reporting:donor' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'donor' %}active{% endif %}">
+    <i class="bi bi-people"></i> Donor Reports
+  </a>
+
+  <div class="sidebar-section-label">Deadlines & Workflow</div>
+  <a href="{% url 'notifications:deadlines' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'deadlines' %}active{% endif %}">
+    <i class="bi bi-alarm"></i> Deadlines
+  </a>
+  <a href="{% url 'notifications:delegations' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'delegations' %}active{% endif %}">
+    <i class="bi bi-arrow-left-right"></i> Delegations
+  </a>
+  {% if is_unit_head %}
+  <a href="{% url 'notifications:unit_head_dashboard' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'unit_head_dashboard' %}active{% endif %}">
+    <i class="bi bi-diagram-2"></i> My Unit
+  </a>
+  {% endif %}
+
+  {% if user.is_global_admin or user.is_staff %}
+  <div class="sidebar-section-label">Administration</div>
+  <a href="{% url 'accounts:user_list' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}">
+    <i class="bi bi-people-fill"></i> Users
+  </a>
+  <a href="{% url 'accounts:role_list' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'role_list' %}active{% endif %}">
+    <i class="bi bi-shield-lock"></i> Roles & Access
+  </a>
+  <a href="{% url 'notifications:grants' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'grants' %}active{% endif %}">
+    <i class="bi bi-key"></i> Data Access Grants
+  </a>
+  <a href="{% url 'notifications:template_list' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'template_list' %}active{% endif %}">
+    <i class="bi bi-clock-history"></i> Deadline Templates
+  </a>
+  <a href="{% url 'notifications:unit_heads' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'unit_heads' %}active{% endif %}">
+    <i class="bi bi-person-badge"></i> Unit Heads
+  </a>
+  <a href="/admin/" class="nav-link-sidebar">
+    <i class="bi bi-gear"></i> System Admin
+  </a>
+  {% endif %}
+
+  <div style="height: 2rem;"></div>
+</nav>
+
+<!-- Topbar -->
+<header class="topbar">
+  <button class="btn btn-sm d-lg-none" onclick="toggleSidebar()" style="color:#64748b;border:none;padding:0.25rem;">
+    <i class="bi bi-list fs-5"></i>
+  </button>
+  <nav class="topbar-breadcrumb" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      {% block breadcrumb %}
+      <li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Home</a></li>
+      {% endblock %}
+    </ol>
+  </nav>
+
+  <div class="d-flex align-items-center gap-2">
+    {% if active_country_office %}
+    <span class="badge" style="background:var(--dodo-blue-light);color:var(--dodo-blue);font-weight:600;font-size:0.75rem;">
+      <i class="bi bi-geo-alt-fill me-1"></i>{{ active_country_office.name }}
+    </span>
+    {% endif %}
+
+    <!-- Notifications Bell -->
+    <div class="dropdown">
+      <button class="btn btn-sm position-relative" data-bs-toggle="dropdown" style="border:1px solid #e2e8f0;border-radius:8px;padding:0.4rem 0.6rem;background:#fff;">
+        <i class="bi bi-bell" style="color:#64748b;font-size:1rem;"></i>
+        {% if unread_notifications_count %}
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill"
+              style="background:var(--dodo-red);font-size:0.6rem;padding:0.25rem 0.45rem;">
+          {{ unread_notifications_count }}
+        </span>
+        {% endif %}
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border:1px solid #e2e8f0;border-radius:12px;min-width:380px;padding:0;max-height:480px;overflow:hidden;">
+        <li style="padding:0.75rem 1rem;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;">
+          <strong style="font-size:0.85rem;">Notifications</strong>
+          {% if unread_notifications_count %}
+          <form method="post" action="{% url 'notifications:mark_all_read' %}" style="margin:0;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-link p-0" style="font-size:0.75rem;text-decoration:none;">Mark all read</button>
+          </form>
+          {% endif %}
+        </li>
+        <div style="max-height:320px;overflow-y:auto;">
+        {% for n in recent_notifications %}
+        <li>
+          <a href="{% if n.action_url %}{{ n.action_url }}{% else %}{% url 'notifications:center' %}{% endif %}"
+             class="dropdown-item d-flex gap-2"
+             style="padding:0.65rem 1rem;border-bottom:1px solid #f8fafc;white-space:normal;{% if not n.is_read %}background:#f0f9ff;{% endif %}">
+            <div style="flex-shrink:0;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:{% if n.priority == 'critical' %}#fee2e2;color:#991b1b{% elif n.priority == 'high' %}#fef3c7;color:#92400e{% else %}#e0f2fe;color:#0369a1{% endif %};">
+              <i class="bi bi-{% if n.notification_type == 'reminder' %}alarm{% elif n.notification_type == 'overdue' or n.notification_type == 'escalation' %}exclamation-triangle{% elif n.notification_type == 'delegation' %}arrow-left-right{% elif n.notification_type == 'approval' %}patch-check{% elif n.notification_type == 'access_granted' %}key{% else %}bell{% endif %}"></i>
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:0.8rem;font-weight:{% if not n.is_read %}600{% else %}500{% endif %};color:#1a202c;">{{ n.title|truncatechars:60 }}</div>
+              <div style="font-size:0.72rem;color:#64748b;margin-top:2px;">{{ n.message|truncatechars:80 }}</div>
+              <div style="font-size:0.68rem;color:#94a3b8;margin-top:2px;">{{ n.created_at|timesince }} ago</div>
+            </div>
+          </a>
+        </li>
+        {% empty %}
+        <li style="padding:2rem;text-align:center;color:#94a3b8;font-size:0.82rem;">
+          <i class="bi bi-bell-slash fs-3 d-block mb-2" style="opacity:0.3;"></i>
+          No notifications yet
+        </li>
+        {% endfor %}
+        </div>
+        <li><a href="{% url 'notifications:center' %}" class="dropdown-item text-center" style="padding:0.75rem;border-top:1px solid #f1f5f9;font-size:0.82rem;color:var(--dodo-blue);font-weight:600;">View all notifications →</a></li>
+      </ul>
+    </div>
+
+    <div class="dropdown">
+      <button class="btn btn-sm d-flex align-items-center gap-2" data-bs-toggle="dropdown" style="color:#374151;border:1px solid #e2e8f0;border-radius:8px;padding:0.35rem 0.75rem;background:#fff;">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--dodo-blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;">
+          {{ user.first_name.0 }}{{ user.last_name.0 }}
+        </div>
+        <span style="font-size:0.83rem;font-weight:500;">{{ user.get_full_name|default:user.email }}</span>
+        <i class="bi bi-chevron-down" style="font-size:0.7rem;"></i>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border:1px solid #e2e8f0;border-radius:10px;min-width:200px;">
+        <li><h6 class="dropdown-header text-truncate" style="max-width:180px;">{{ user.email }}</h6></li>
+        <li><a class="dropdown-item" href="{% url 'accounts:profile' %}"><i class="bi bi-person me-2"></i>Profile</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li>
+          <form method="post" action="{% url 'accounts:logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="dropdown-item text-danger">
+              <i class="bi bi-box-arrow-right me-2"></i>Sign Out
+            </button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</header>
+
+<!-- Main content -->
+<main class="main-content">
+  <div class="content-area fade-in">
+    {% if messages %}
+    <div class="mb-3">
+      {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible" role="alert">
+        <i class="bi bi-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' or message.tags == 'danger' %}exclamation-triangle{% else %}info-circle{% endif %} me-2"></i>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </div>
+</main>
+
+{% endif %}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+function switchOffice(coId) {
+  fetch(`/accounts/switch-office/${coId}/`, {
+    method: 'POST',
+    headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value, 'Content-Type': 'application/x-www-form-urlencoded'},
+  }).then(() => location.reload());
+}
+// Auto-dismiss alerts
+setTimeout(() => {
+  document.querySelectorAll('.alert').forEach(el => {
+    new bootstrap.Alert(el).close();
+  });
+}, 5000);
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

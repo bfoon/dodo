@@ -1,0 +1,162 @@
+services:
+  # ---------------------------------------------------------------------
+  # PostgreSQL database
+  # ---------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: dodo_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-dodo}
+      POSTGRES_USER: ${DB_USER:-dodo}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dodo_secure_2026}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "${DB_PORT_EXPOSED:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-dodo} -d ${DB_NAME:-dodo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dodo_net
+
+  # ---------------------------------------------------------------------
+  # Redis — cache + celery broker
+  # ---------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: dodo_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT_EXPOSED:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - dodo_net
+
+  # ---------------------------------------------------------------------
+  # Django web application (Gunicorn)
+  # ---------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dodo_web
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+      LOAD_DEMO_DATA: ${LOAD_DEMO_DATA:-1}
+    volumes:
+      - ./:/app                              # ← bind-mount project code
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+      - ./logs:/app/logs
+    ports:
+      - "${WEB_PORT_EXPOSED:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - dodo_net
+
+  # ---------------------------------------------------------------------
+  # Celery worker — async tasks (email, report generation)
+  # ---------------------------------------------------------------------
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dodo_celery
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+      RUN_MIGRATIONS: 0
+      COLLECT_STATIC: 0
+      LOAD_DEMO_DATA: 0
+    command: celery -A dodo worker -l info --concurrency=2
+    volumes:
+      - ./:/app                              # ← bind-mount project code
+      - media_data:/app/media
+      - ./logs:/app/logs
+    depends_on:
+      web:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - dodo_net
+
+  # ---------------------------------------------------------------------
+  # Celery Beat — scheduled tasks (daily reminder dispatch)
+  # ---------------------------------------------------------------------
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dodo_beat
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+      RUN_MIGRATIONS: 0
+      COLLECT_STATIC: 0
+      LOAD_DEMO_DATA: 0
+    command: celery -A dodo beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - ./:/app                              # ← bind-mount project code
+      - ./logs:/app/logs
+    depends_on:
+      web:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - dodo_net
+
+  # ---------------------------------------------------------------------
+  # Nginx reverse proxy — serves static files and forwards to Gunicorn
+  # ---------------------------------------------------------------------
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: dodo_nginx
+    restart: unless-stopped
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - static_data:/app/staticfiles:ro
+      - media_data:/app/media:ro
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      - web
+    networks:
+      - dodo_net
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_data:
+  static_data:
+
+networks:
+  dodo_net:
+    driver: bridge

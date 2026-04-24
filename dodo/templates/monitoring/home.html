@@ -1,0 +1,222 @@
+{% extends 'base.html' %}
+{% block title %}Monitoring — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item active">Monitoring</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.stat-card { border:1px solid #e2e8f0; border-radius:12px; padding:1rem 1.1rem; background:#fff; height:100%; transition:all .15s ease; }
+.stat-card:hover { border-color:var(--dodo-blue); box-shadow:0 4px 12px rgba(0,119,200,0.06); }
+.stat-card .lbl { font-size:0.72rem; text-transform:uppercase; letter-spacing:.04em; font-weight:600; color:#64748b; }
+.stat-card .val { font-size:1.75rem; font-weight:700; color:#0f172a; line-height:1.1; margin-top:.25rem; }
+.stat-card .sub { font-size:0.74rem; color:#94a3b8; margin-top:.2rem; }
+.stat-card .ico { width:40px; height:40px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-size:1.15rem; }
+.action-card { border:1px solid #e2e8f0; border-radius:12px; padding:1.1rem; background:#fff; text-decoration:none; color:inherit; display:block; height:100%; transition:all .15s ease; }
+.action-card:hover { border-color:var(--dodo-blue); background:#f0f7ff; color:inherit; transform:translateY(-1px); }
+.action-card .ico { width:42px; height:42px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-size:1.2rem; margin-bottom:.6rem; }
+.action-card h6 { font-weight:600; font-size:0.92rem; margin-bottom:.25rem; color:#0f172a; }
+.action-card p { font-size:0.78rem; color:#64748b; margin-bottom:0; line-height:1.4; }
+.empty-block { padding:2rem 1rem; text-align:center; color:#94a3b8; font-size:0.85rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-compass me-2" style="color:var(--dodo-blue);"></i>Monitoring</h1>
+    <p class="page-header-sub">Indicator tracking, output verification, and field monitoring visits</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'monitoring:create_visit' %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-plus-lg me-1"></i>Log Field Visit
+    </a>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div class="row g-3 mb-3">
+  <div class="col-md-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="lbl">Verifications</div>
+          <div class="val">{{ stats.verifications_total|default:0 }}</div>
+          <div class="sub">{{ stats.verifications_completed|default:0 }} completed · {{ stats.verifications_pending|default:0 }} in progress</div>
+        </div>
+        <div class="ico" style="background:rgba(0,119,200,0.12);color:var(--dodo-blue);">
+          <i class="bi bi-shield-check"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="lbl">Field Visits</div>
+          <div class="val">{{ stats.visits_total|default:0 }}</div>
+          <div class="sub">{{ stats.visits_this_quarter|default:0 }} this quarter</div>
+        </div>
+        <div class="ico" style="background:rgba(245,158,11,0.12);color:#f59e0b;">
+          <i class="bi bi-geo-alt"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="lbl">CPD Indicators</div>
+          <div class="val">{{ stats.indicators_total|default:0 }}</div>
+          <div class="sub">{{ stats.indicators_with_data|default:0 }} with latest data</div>
+        </div>
+        <div class="ico" style="background:rgba(22,163,74,0.12);color:#16a34a;">
+          <i class="bi bi-graph-up"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="lbl">Active Projects</div>
+          <div class="val">{{ stats.active_projects|default:0 }}</div>
+          <div class="sub">Under monitoring</div>
+        </div>
+        <div class="ico" style="background:rgba(124,58,237,0.12);color:#7c3aed;">
+          <i class="bi bi-folder2-open"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick actions -->
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <a href="{% url 'monitoring:indicators' %}" class="action-card">
+      <div class="ico" style="background:rgba(0,119,200,0.12);color:var(--dodo-blue);">
+        <i class="bi bi-bar-chart-line"></i>
+      </div>
+      <h6>CPD Indicators</h6>
+      <p>Enter quarterly achievements against each CPD indicator.</p>
+    </a>
+  </div>
+  <div class="col-md-4">
+    <a href="{% url 'monitoring:verification' %}" class="action-card">
+      <div class="ico" style="background:rgba(22,163,74,0.12);color:#16a34a;">
+        <i class="bi bi-shield-check"></i>
+      </div>
+      <h6>Output Verification</h6>
+      <p>Track field verification, document review, and validation stages.</p>
+    </a>
+  </div>
+  <div class="col-md-4">
+    <a href="{% url 'monitoring:visits' %}" class="action-card">
+      <div class="ico" style="background:rgba(245,158,11,0.12);color:#f59e0b;">
+        <i class="bi bi-geo-alt"></i>
+      </div>
+      <h6>Field Visits</h6>
+      <p>Log monitoring visits with findings, recommendations, and follow-ups.</p>
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Recent verifications -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0" style="font-weight:600;">
+          <i class="bi bi-shield-check me-2" style="color:var(--dodo-blue);"></i>Recent Verifications
+        </h6>
+        <a href="{% url 'monitoring:verification' %}" style="font-size:0.78rem;color:var(--dodo-blue);text-decoration:none;">
+          View all <i class="bi bi-arrow-right"></i>
+        </a>
+      </div>
+      <div class="card-body p-0">
+        {% if verifications %}
+        <table class="table table-hover mb-0">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th style="font-size:0.72rem;text-transform:uppercase;color:#64748b;">Project</th>
+              <th style="font-size:0.72rem;text-transform:uppercase;color:#64748b;">Cycle</th>
+              <th style="font-size:0.72rem;text-transform:uppercase;color:#64748b;">Status</th>
+              <th style="font-size:0.72rem;text-transform:uppercase;color:#64748b;">Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in verifications %}
+            <tr>
+              <td style="font-size:0.82rem;">
+                <a href="{% url 'projects:detail' v.project.pk %}" style="color:#0f172a;text-decoration:none;font-weight:500;">
+                  {{ v.project.display_title|truncatechars:45 }}
+                </a>
+              </td>
+              <td style="font-size:0.78rem;color:#64748b;">
+                <span class="badge bg-light text-dark" style="font-size:0.7rem;">
+                  {{ v.cycle.year }} {{ v.cycle.quarter }}
+                </span>
+              </td>
+              <td><span class="badge bg-{{ v.get_status_color }}" style="font-size:0.7rem;">{{ v.get_status_display }}</span></td>
+              <td style="font-size:0.76rem;color:#94a3b8;">{{ v.verified_at|default:v.cycle.year|date:"d M"|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty-block">
+          <i class="bi bi-shield-check d-block mb-2" style="font-size:2rem;color:#cbd5e1;"></i>
+          No verifications recorded yet.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent visits -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0" style="font-weight:600;">
+          <i class="bi bi-geo-alt me-2" style="color:#f59e0b;"></i>Recent Field Visits
+        </h6>
+        <a href="{% url 'monitoring:visits' %}" style="font-size:0.78rem;color:var(--dodo-blue);text-decoration:none;">
+          View all <i class="bi bi-arrow-right"></i>
+        </a>
+      </div>
+      <div class="card-body p-0">
+        {% if recent_visits %}
+        <div class="list-group list-group-flush">
+          {% for v in recent_visits %}
+          <div class="list-group-item" style="font-size:0.82rem;">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <div style="font-weight:500;color:#0f172a;">{{ v.project.display_title|truncatechars:35 }}</div>
+              <span class="badge bg-light text-dark" style="font-size:0.68rem;">{{ v.get_visit_type_display }}</span>
+            </div>
+            <div style="font-size:0.74rem;color:#64748b;">
+              <i class="bi bi-calendar3 me-1"></i>{{ v.visit_date|date:"d M Y" }}
+              {% if v.location %} · <i class="bi bi-pin-map me-1"></i>{{ v.location|truncatechars:25 }}{% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-block">
+          <i class="bi bi-geo-alt d-block mb-2" style="font-size:2rem;color:#cbd5e1;"></i>
+          <div class="mb-2">No field visits logged yet.</div>
+          <a href="{% url 'monitoring:create_visit' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.78rem;">
+            <i class="bi bi-plus-lg me-1"></i>Log first visit
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

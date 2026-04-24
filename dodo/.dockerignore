@@ -1,0 +1,49 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+.eggs
+.pytest_cache
+.mypy_cache
+.coverage
+htmlcov/
+
+# Virtual envs
+venv/
+.venv/
+env/
+.env/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Local dev files
+.env
+.env.local
+*.sqlite3
+db.sqlite3
+media/
+staticfiles/
+logs/
+*.log
+
+# Docker
+docker-compose.override.yml
+
+# Docs / packaging
+*.md
+!README.md
+undp_me_platform*.zip
+
+# Node (if added later)
+node_modules/

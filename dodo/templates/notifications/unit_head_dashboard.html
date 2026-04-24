@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block title %}Unit Dashboard  — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item active">My Unit</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-diagram-2 me-2" style="color:var(--dodo-blue);"></i>Head of Unit Dashboard</h1>
+    <p class="page-header-sub">
+      Leading: {% for u in headed_units %}<span class="badge" style="background:{{ u.color }};color:#fff;font-size:0.72rem;margin-right:4px;">{{ u.name }}</span>{% endfor %}
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'notifications:delegate' %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;">
+      <i class="bi bi-arrow-left-right me-1"></i>Delegate Report
+    </a>
+  </div>
+</div>
+
+<!-- KPIs -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#0077c8,#005a9e);">
+      <div class="stat-value">{{ projects.count }}</div>
+      <div class="stat-label">Projects in Unit</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#009e60,#007a4a);">
+      <div class="stat-value">{{ completed }}</div>
+      <div class="stat-label">Reports Completed</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#f59e0b,#d97706);">
+      <div class="stat-value">{{ at_risk }}</div>
+      <div class="stat-label">At Risk</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#ef4444,#b91c1c);">
+      <div class="stat-value">{{ overdue }}</div>
+      <div class="stat-label">Overdue</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Upcoming Deadlines -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h6 class="mb-0" style="font-weight:600;"><i class="bi bi-alarm me-2" style="color:var(--dodo-blue);"></i>Upcoming Deadlines</h6>
+        <a href="{% url 'notifications:deadlines' %}" class="btn btn-sm btn-link p-0" style="font-size:0.78rem;">View all →</a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead style="background:#f8fafc;">
+            <tr><th>Project</th><th>Cycle</th><th class="text-center">Due In</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for d in deadlines %}
+            <tr>
+              <td>
+                <a href="{% url 'projects:detail' d.project.pk %}" style="color:#1a202c;text-decoration:none;font-weight:500;font-size:0.82rem;">
+                  {{ d.project.display_title|truncatechars:40 }}
+                </a>
+              </td>
+              <td><span class="badge bg-light text-dark" style="font-size:0.7rem;">{{ d.cycle.year }} {{ d.cycle.quarter }}</span></td>
+              <td class="text-center">
+                {% with days=d.get_days_until_deadline %}
+                {% if days < 0 %}<span class="badge" style="background:#fee2e2;color:#991b1b;">{{ days|stringformat:"+d" }}d</span>
+                {% elif days <= 3 %}<span class="badge" style="background:#fef3c7;color:#92400e;">{{ days }}d</span>
+                {% else %}<span class="badge bg-light text-dark">{{ days }}d</span>{% endif %}
+                {% endwith %}
+              </td>
+              <td>
+                {% if d.status == 'completed' %}<span class="badge badge-submitted">Completed</span>
+                {% elif d.status == 'overdue' %}<span class="badge badge-overdue">Overdue</span>
+                {% elif d.status == 'at_risk' %}<span class="badge badge-pending">At Risk</span>
+                {% elif d.status == 'in_progress' %}<span class="badge badge-under_review">In Progress</span>
+                {% else %}<span class="badge badge-not_started">Upcoming</span>{% endif %}
+              </td>
+              <td>
+                <a href="{% url 'notifications:delegate' %}?project={{ d.project.pk }}&cycle={{ d.cycle.pk }}"
+                   class="btn btn-sm btn-outline-primary" style="border-radius:6px;font-size:0.72rem;" title="Delegate">
+                  <i class="bi bi-arrow-left-right"></i>
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center py-4 text-muted">No upcoming deadlines</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Assignments -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0" style="font-weight:600;"><i class="bi bi-person-check me-2" style="color:var(--dodo-blue);"></i>Active Report Assignments</h6>
+      </div>
+      <div class="card-body p-0" style="max-height:420px;overflow-y:auto;">
+        {% for a in assignments %}
+        <div class="p-3 border-bottom">
+          <div class="d-flex justify-content-between align-items-start">
+            <div style="flex:1;">
+              <div style="font-weight:500;color:#1a202c;font-size:0.83rem;">{{ a.project.display_title|truncatechars:50 }}</div>
+              <div style="font-size:0.75rem;color:#64748b;margin-top:2px;">
+                <i class="bi bi-person me-1"></i>{{ a.assigned_to.get_full_name }}
+                · <i class="bi bi-calendar me-1"></i>{{ a.cycle.year }} {{ a.cycle.quarter }}
+              </div>
+            </div>
+            <span class="badge
+              {% if a.status == 'approved' %}badge-submitted
+              {% elif a.status == 'submitted' or a.status == 'under_review' %}badge-under_review
+              {% elif a.status == 'in_progress' %}badge-pending
+              {% elif a.status == 'revisions_requested' %}badge-overdue
+              {% else %}badge-not_started{% endif %}" style="font-size:0.7rem;">
+              {{ a.get_status_display }}
+            </span>
+          </div>
+        </div>
+        {% empty %}
+        <div class="p-4 text-center text-muted">
+          <i class="bi bi-person-check fs-3 d-block mb-2" style="color:#cbd5e1;"></i>
+          <div style="font-size:0.85rem;">No active assignments</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

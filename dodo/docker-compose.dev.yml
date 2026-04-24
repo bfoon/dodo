@@ -1,0 +1,28 @@
+# Development override — use with: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Mounts source code for live reloading and uses Django's runserver.
+services:
+  web:
+    command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      DJANGO_DEBUG: "True"
+      RUN_MIGRATIONS: 1
+      LOAD_DEMO_DATA: 1
+    volumes:
+      - .:/app
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+    ports:
+      - "8000:8000"
+
+  celery_worker:
+    command: celery -A dodo worker -l debug --concurrency=1
+    volumes:
+      - .:/app
+
+  celery_beat:
+    command: celery -A dodo beat -l debug --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - .:/app
+
+  nginx:
+    profiles: ["production"]   # disabled in dev; access Django directly at :8000

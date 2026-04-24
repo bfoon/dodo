@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+{% load me_extras %}
+{% block title %}Reporting Tracker  — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Home</a></li>
+<li class="breadcrumb-item active">Reporting Tracker</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.tracker-wrap { overflow-x: auto; }
+.sticky-col { position: sticky; left: 0; background: #fff; z-index: 2; }
+.tracker-th-sticky { position: sticky; left: 0; background: #f8fafc; z-index: 3; }
+.quarter-header { min-width: 140px; text-align: center; }
+.cluster-row td { background: #f0f7ff; font-weight: 700; font-size: 0.8rem; color: var(--dodo-blue); border-top: 2px solid #dbeafe; }
+.cluster-row-label { display: flex; align-items: center; gap: 0.5rem; }
+.status-select { font-size: 0.75rem; padding: 0.2rem 0.4rem; border-radius: 6px; border: 1px solid #e2e8f0; cursor: pointer; }
+.filter-bar { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 0.75rem 1rem; margin-bottom: 1rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-table me-2" style="color:var(--dodo-blue);"></i>Reporting Tracker</h1>
+    <p class="page-header-sub">Track progress reporting and output verification by cluster and quarter</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'reporting:progress' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-file-earmark-bar-graph me-1"></i>Full Report
+    </a>
+  </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar d-flex gap-3 align-items-center flex-wrap">
+  <form method="get" class="d-flex gap-2 align-items-center flex-wrap">
+    <div class="d-flex align-items-center gap-2">
+      <label style="font-size:0.8rem;font-weight:600;color:#374151;white-space:nowrap;">Year</label>
+      <select name="year" class="form-select form-select-sm" style="width:90px;border-radius:7px;" onchange="this.form.submit()">
+        {% for y in years %}<option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <label style="font-size:0.8rem;font-weight:600;color:#374151;white-space:nowrap;">Type</label>
+      <select name="type" class="form-select form-select-sm" style="width:180px;border-radius:7px;" onchange="this.form.submit()">
+        <option value="progress" {% if cycle_type == 'progress' %}selected{% endif %}>Progress Reporting</option>
+        <option value="verification" {% if cycle_type == 'verification' %}selected{% endif %}>Output Verification</option>
+      </select>
+    </div>
+  </form>
+
+  <!-- Legend -->
+  <div class="ms-auto d-flex gap-2 flex-wrap">
+    <span class="badge badge-submitted">Submitted</span>
+    <span class="badge badge-pending">Pending</span>
+    <span class="badge badge-under_review">Under Review</span>
+    <span class="badge badge-overdue">Overdue</span>
+    <span class="badge badge-not_started">Not Started</span>
+    <span class="badge badge-not_applicable">N/A</span>
+  </div>
+</div>
+
+<!-- Tracker Table -->
+<div class="card">
+  <div class="card-body p-0">
+    <div class="tracker-wrap">
+      <table class="table table-bordered tracker-table mb-0" id="trackerTable">
+        <thead style="background:#f8fafc;">
+          <tr>
+            <th class="tracker-th-sticky" style="min-width:250px;">Project</th>
+            <th class="tracker-th-sticky" style="min-width:110px;left:250px;">Status</th>
+            {% for q in quarters %}
+            <th class="quarter-header text-center">
+              <div style="font-weight:700;color:var(--dodo-blue);">{{ q }}</div>
+              <div style="font-size:0.7rem;font-weight:400;color:#64748b;">{{ year }}</div>
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for group in tracker_data %}
+          <!-- Cluster Header Row -->
+          <tr class="cluster-row">
+            <td colspan="{{ quarters|length|add:2 }}">
+              <div class="cluster-row-label">
+                <div style="width:12px;height:12px;border-radius:3px;background:{{ group.unit.color }};"></div>
+                {{ group.unit.name }}
+                <span class="badge" style="background:rgba(0,119,200,0.15);color:var(--dodo-blue);font-weight:500;font-size:0.72rem;">
+                  {{ group.rows|length }} project{{ group.rows|length|pluralize }}
+                </span>
+              </div>
+            </td>
+          </tr>
+          {% for row in group.rows %}
+          <tr>
+            <td class="sticky-col project-cell">
+              <a href="{% url 'projects:detail' row.project.pk %}" class="text-decoration-none">
+                <span class="project-name" title="{{ row.project.title }}">
+                  {% if row.project.pims_id %}<span style="font-size:0.7rem;color:#94a3b8;">{{ row.project.pims_id }}</span><br>{% endif %}
+                  {{ row.project.display_title }}
+                </span>
+              </a>
+            </td>
+            <td class="sticky-col" style="left:250px;">
+              <span class="badge badge-{{ row.project.status }}">{{ row.project.get_status_display }}</span>
+            </td>
+            {% for q in quarters %}
+            <td class="text-center" style="vertical-align:middle;">
+              {% with s=row.statuses|get_item:q %}
+              {% if s %}
+              <div class="dropdown">
+                <button class="btn btn-sm status-pill badge-{{ s.status }}" data-bs-toggle="dropdown" style="font-size:0.72rem;border:none;cursor:pointer;">
+                  {% if s.status == 'submitted' %}<i class="bi bi-check-circle-fill status-dot" style="color:#166534;"></i>
+                  {% elif s.status == 'pending' %}<i class="bi bi-clock-fill status-dot" style="color:#854d0e;"></i>
+                  {% elif s.status == 'under_review' %}<i class="bi bi-eye-fill status-dot" style="color:#1e40af;"></i>
+                  {% elif s.status == 'overdue' %}<i class="bi bi-exclamation-triangle-fill status-dot" style="color:#991b1b;"></i>
+                  {% elif s.status == 'not_applicable' %}<i class="bi bi-dash-circle status-dot" style="color:#94a3b8;"></i>
+                  {% else %}<i class="bi bi-circle status-dot" style="color:#94a3b8;"></i>{% endif %}
+                  {{ s.get_status_display }}
+                </button>
+                <ul class="dropdown-menu" style="font-size:0.8rem;border-radius:10px;border:1px solid #e2e8f0;">
+                  <li><h6 class="dropdown-header">Update Status</h6></li>
+                  {% for sc, sl in s.STATUS_CHOICES %}
+                  <li>
+                    <form method="post" action="{% url 'projects:update_status' row.project.pk %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="cycle_id" value="{{ s.cycle.pk }}">
+                      <input type="hidden" name="status" value="{{ sc }}">
+                      <button class="dropdown-item{% if sc == s.status %} active{% endif %}" type="submit">{{ sl }}</button>
+                    </form>
+                  </li>
+                  {% endfor %}
+                </ul>
+              </div>
+              {% else %}
+              <span class="status-pill badge-not_started" style="font-size:0.72rem;cursor:default;display:inline-flex;align-items:center;gap:3px;padding:0.2rem 0.5rem;border-radius:20px;">
+                <i class="bi bi-circle" style="font-size:0.6rem;color:#94a3b8;"></i>—
+              </span>
+              {% endif %}
+              {% endwith %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% empty %}
+          <tr><td colspan="{{ quarters|length|add:2 }}" class="text-center py-3 text-muted" style="font-size:0.82rem;">No projects in this cluster</td></tr>
+          {% endfor %}
+          {% empty %}
+          <tr>
+            <td colspan="{{ quarters|length|add:2 }}" class="text-center py-5">
+              <i class="bi bi-table fs-2 d-block mb-2" style="color:#94a3b8;"></i>
+              <div class="text-muted">No data found. Add projects and reporting cycles to see the tracker.</div>
+              <div class="mt-2">
+                <a href="{% url 'projects:create' %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;">Add Project</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="mt-3 text-muted" style="font-size:0.75rem;">
+  <i class="bi bi-info-circle me-1"></i>
+  Click on a status badge to update it. Changes are saved immediately.
+  {% if cycle_type == 'progress' %}Showing <strong>Progress Reporting</strong> tracker.{% else %}Showing <strong>Output Verification</strong> tracker.{% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Add get_item filter support via JS fallback
+document.querySelectorAll('.dropdown-item').forEach(btn => {
+  btn.addEventListener('click', function(e) {
+    if (this.closest('form')) return;
+    e.preventDefault();
+  });
+});
+</script>
+{% endblock %}

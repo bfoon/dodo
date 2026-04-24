@@ -1,0 +1,149 @@
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+
+
+class CountryOffice(models.Model):
+    name = models.CharField(max_length=200)
+    code = models.CharField(max_length=10, unique=True)
+    region = models.CharField(max_length=100)
+    timezone = models.CharField(max_length=50, default='UTC')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+
+class Role(models.Model):
+    """Dynamic roles per country office"""
+    PERMISSION_CHOICES = [
+        ('view', 'View Only'),
+        ('create', 'Create'),
+        ('edit', 'Edit'),
+        ('delete', 'Delete'),
+        ('approve', 'Approve'),
+        ('admin', 'Admin'),
+    ]
+    name = models.CharField(max_length=100)
+    code = models.SlugField(max_length=100)
+    country_office = models.ForeignKey(CountryOffice, on_delete=models.CASCADE, related_name='roles')
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['code', 'country_office']
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} [{self.country_office.code}]"
+
+
+class ModulePermission(models.Model):
+    """Dynamic module-level permissions for roles"""
+    MODULE_CHOICES = [
+        ('dashboard', 'Dashboard'),
+        ('projects', 'Projects'),
+        ('monitoring', 'Monitoring & Indicators'),
+        ('surveys', 'Surveys & Data Collection'),
+        ('reporting', 'Reporting'),
+        ('users', 'User Management'),
+        ('admin', 'Administration'),
+    ]
+    ACTION_CHOICES = [
+        ('view', 'View'),
+        ('create', 'Create'),
+        ('edit', 'Edit'),
+        ('delete', 'Delete'),
+        ('approve', 'Approve'),
+        ('export', 'Export'),
+    ]
+    role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name='permissions')
+    module = models.CharField(max_length=50, choices=MODULE_CHOICES)
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+
+    class Meta:
+        unique_together = ['role', 'module', 'action']
+
+    def __str__(self):
+        return f"{self.role.name} - {self.module}: {self.action}"
+
+
+class User(AbstractUser):
+    """Extended user with country office and role assignments"""
+    email = models.EmailField(unique=True)
+    phone = models.CharField(max_length=30, blank=True)
+    position = models.CharField(max_length=200, blank=True)
+    profile_photo = models.ImageField(upload_to='profiles/', blank=True, null=True)
+    is_global_admin = models.BooleanField(default=False, help_text='Can access all country offices')
+    primary_country_office = models.ForeignKey(
+        CountryOffice, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='primary_users'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_modified = models.DateTimeField(auto_now=True)
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
+
+    def __str__(self):
+        return f"{self.get_full_name()} ({self.email})"
+
+    def get_country_offices(self):
+        if self.is_global_admin:
+            return CountryOffice.objects.filter(is_active=True)
+        return CountryOffice.objects.filter(
+            user_access__user=self, user_access__is_active=True
+        ).distinct()
+
+    def has_module_permission(self, module, action, country_office=None):
+        if self.is_superuser or self.is_global_admin:
+            return True
+        qs = self.user_access.filter(is_active=True)
+        if country_office:
+            qs = qs.filter(country_office=country_office)
+        role_ids = qs.values_list('role_id', flat=True)
+        return ModulePermission.objects.filter(
+            role_id__in=role_ids, module=module, action=action
+        ).exists()
+
+
+class UserCountryAccess(models.Model):
+    """Links users to country offices with specific roles"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_access')
+    country_office = models.ForeignKey(CountryOffice, on_delete=models.CASCADE, related_name='user_access')
+    role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name='user_access')
+    granted_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name='granted_access'
+    )
+    is_active = models.BooleanField(default=True)
+    granted_at = models.DateTimeField(auto_now_add=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = ['user', 'country_office', 'role']
+
+    def __str__(self):
+        return f"{self.user} → {self.country_office} [{self.role.name}]"
+
+
+class ActivityLog(models.Model):
+    """Audit trail"""
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    country_office = models.ForeignKey(CountryOffice, on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField(max_length=50)
+    module = models.CharField(max_length=50)
+    object_id = models.CharField(max_length=50, blank=True)
+    object_repr = models.CharField(max_length=200, blank=True)
+    details = models.TextField(blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.user} - {self.action} - {self.timestamp}"

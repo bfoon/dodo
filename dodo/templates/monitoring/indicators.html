@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+{% block title %}CPD Indicators — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'monitoring:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Monitoring</a></li>
+<li class="breadcrumb-item active">Indicators</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.filter-bar { background:#fff; border-radius:12px; border:1px solid #e2e8f0; padding:.75rem 1rem; margin-bottom:1rem; }
+.outcome-group { margin-bottom:1.25rem; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; background:#fff; }
+.outcome-head { padding:.75rem 1rem; background:#f0f7ff; border-bottom:1px solid #dbeafe; display:flex; align-items:center; gap:.6rem; cursor:pointer; }
+.outcome-head .code { font-size:0.72rem; font-weight:700; color:#fff; padding:.2rem .55rem; border-radius:5px; background:var(--dodo-blue); white-space:nowrap; }
+.outcome-head.tier-impact .code { background:#7c3aed; }
+.outcome-head.tier-output .code { background:#16a34a; }
+.outcome-head .title { flex-grow:1; font-size:0.88rem; font-weight:600; color:#0f172a; line-height:1.35; }
+.outcome-head .chev { color:#64748b; transition:transform .2s; }
+.outcome-group.expanded .outcome-head .chev { transform:rotate(90deg); }
+.indicator-row { padding:.75rem 1rem; border-bottom:1px solid #f1f5f9; display:flex; align-items:flex-start; gap:.75rem; }
+.indicator-row:last-child { border-bottom:none; }
+.indicator-row:hover { background:#fafbfc; }
+.indicator-meta { flex-grow:1; min-width:0; }
+.indicator-meta .desc { font-size:0.86rem; color:#0f172a; line-height:1.4; font-weight:500; }
+.indicator-meta .sub { font-size:0.74rem; color:#64748b; margin-top:.3rem; display:flex; gap:1rem; flex-wrap:wrap; }
+.indicator-meta .sub .lbl { color:#94a3b8; text-transform:uppercase; font-weight:600; font-size:0.68rem; letter-spacing:.02em; margin-right:.2rem; }
+.indicator-actions { flex-shrink:0; display:flex; gap:.35rem; align-items:center; }
+.empty-state { padding:3rem 1rem; text-align:center; color:#64748b; }
+.empty-state i { font-size:2.5rem; color:#cbd5e1; display:block; margin-bottom:.5rem; }
+.progress-mini { height:4px; background:#e2e8f0; border-radius:2px; overflow:hidden; width:80px; margin-top:.4rem; }
+.progress-mini > div { height:100%; background:var(--dodo-blue); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-bar-chart-line me-2" style="color:var(--dodo-blue);"></i>CPD Indicators</h1>
+    <p class="page-header-sub">Enter and track quarterly achievements against programme indicators</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'projects:cpd' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-diagram-3 me-1"></i>Full Framework
+    </a>
+  </div>
+</div>
+
+<div class="filter-bar d-flex gap-2 align-items-center flex-wrap">
+  <input type="search" id="indicatorSearch" class="form-control form-control-sm"
+         placeholder="Search indicators, codes, or outcomes…"
+         style="max-width:360px;border-radius:7px;font-size:0.85rem;">
+  <div class="ms-auto d-flex gap-2">
+    <button class="btn btn-sm btn-outline-secondary" id="expandAll" type="button" style="border-radius:7px;font-size:0.78rem;">
+      <i class="bi bi-arrows-expand me-1"></i>Expand all
+    </button>
+    <button class="btn btn-sm btn-outline-secondary" id="collapseAll" type="button" style="border-radius:7px;font-size:0.78rem;">
+      <i class="bi bi-arrows-collapse me-1"></i>Collapse
+    </button>
+  </div>
+</div>
+
+{% regroup indicators by outcome as outcome_groups %}
+
+{% for og in outcome_groups %}
+<div class="outcome-group expanded"
+     data-search="{{ og.grouper.code|lower }} {{ og.grouper.title|lower }}{% for i in og.list %} {{ i.description|lower }} {{ i.code|lower }}{% endfor %}">
+  <div class="outcome-head tier-{{ og.grouper.tier }}" onclick="this.closest('.outcome-group').classList.toggle('expanded'); this.nextElementSibling.style.display = this.closest('.outcome-group').classList.contains('expanded') ? '' : 'none';">
+    <i class="bi bi-chevron-right chev"></i>
+    <span class="code">{{ og.grouper.code }}</span>
+    <div class="title">{{ og.grouper.title }}</div>
+    <span class="badge bg-light text-dark" style="font-size:0.7rem;">
+      {{ og.grouper.get_tier_display }}
+    </span>
+    <span class="badge" style="background:rgba(0,119,200,0.12);color:var(--dodo-blue);font-size:0.7rem;font-weight:600;">
+      {{ og.list|length }} indicator{{ og.list|length|pluralize }}
+    </span>
+  </div>
+  <div class="indicator-list">
+    {% for ind in og.list %}
+    <div class="indicator-row" data-search="{{ ind.description|lower }} {{ ind.code|lower }}">
+      <div style="flex-shrink:0;padding-top:.15rem;">
+        <i class="bi bi-graph-up" style="color:var(--dodo-blue);font-size:1rem;"></i>
+      </div>
+      <div class="indicator-meta">
+        <div class="desc">
+          {% if ind.code %}<span class="badge bg-light text-dark me-1" style="font-size:0.66rem;">{{ ind.code }}</span>{% endif %}
+          {{ ind.description }}
+        </div>
+        <div class="sub">
+          {% if ind.baseline %}<span><span class="lbl">Baseline:</span>{{ ind.baseline|truncatechars:40 }}</span>{% endif %}
+          {% if ind.end_target %}<span><span class="lbl">Target:</span>{{ ind.end_target|truncatechars:40 }}</span>{% endif %}
+          {% if ind.frequency %}<span><span class="lbl">Frequency:</span>{{ ind.frequency }}</span>{% endif %}
+          {% if ind.cpd_data_source %}<span><span class="lbl">Source:</span>{{ ind.cpd_data_source|truncatechars:30 }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="indicator-actions">
+        <a href="{% url 'monitoring:indicator_data' ind.pk %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:7px;font-size:0.76rem;">
+          <i class="bi bi-pencil-square me-1"></i>Enter data
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% empty %}
+<div class="card">
+  <div class="empty-state">
+    <i class="bi bi-bar-chart-line"></i>
+    <h6 style="font-weight:600;color:#1e293b;">No indicators configured</h6>
+    <p style="font-size:0.85rem;max-width:400px;margin:.5rem auto 1rem;">
+      CPD indicators are set up under the Country Programme Document framework.
+      Ask your M&E focal point to configure them.
+    </p>
+    <a href="{% url 'projects:cpd' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">
+      <i class="bi bi-diagram-3 me-1"></i>View CPD Framework
+    </a>
+  </div>
+</div>
+{% endfor %}
+
+<div id="noResults" class="card mt-3" style="display:none;">
+  <div class="empty-state" style="padding:1.5rem;">
+    <i class="bi bi-search" style="font-size:1.5rem;"></i>
+    <div style="font-size:0.85rem;">No indicators match your search.</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Expand / collapse
+document.getElementById('expandAll')?.addEventListener('click', () => {
+  document.querySelectorAll('.outcome-group').forEach(g => {
+    g.classList.add('expanded');
+    g.querySelector('.indicator-list').style.display = '';
+  });
+});
+document.getElementById('collapseAll')?.addEventListener('click', () => {
+  document.querySelectorAll('.outcome-group').forEach(g => {
+    g.classList.remove('expanded');
+    g.querySelector('.indicator-list').style.display = 'none';
+  });
+});
+
+// Search across outcomes and indicators
+const search = document.getElementById('indicatorSearch');
+const noResults = document.getElementById('noResults');
+if (search) {
+  search.addEventListener('input', function() {
+    const q = this.value.trim().toLowerCase();
+    let visibleGroups = 0;
+    document.querySelectorAll('.outcome-group').forEach(group => {
+      const rows = group.querySelectorAll('.indicator-row');
+      let visibleRows = 0;
+      rows.forEach(r => {
+        const hay = r.dataset.search || '';
+        const show = !q || hay.indexOf(q) !== -1;
+        r.style.display = show ? '' : 'none';
+        if (show) visibleRows++;
+      });
+      // Show group if any row matches OR group's own search matches
+      const groupHay = group.dataset.search || '';
+      const groupMatches = q && groupHay.indexOf(q) !== -1;
+      const show = !q || visibleRows > 0 || groupMatches;
+      group.style.display = show ? '' : 'none';
+      if (show) {
+        visibleGroups++;
+        if (q) {
+          // Auto-expand when filtering
+          group.classList.add('expanded');
+          group.querySelector('.indicator-list').style.display = '';
+          // If the group itself matched but no rows did, show all rows
+          if (groupMatches && visibleRows === 0) {
+            rows.forEach(r => r.style.display = '');
+          }
+        }
+      }
+    });
+    noResults.style.display = (visibleGroups === 0 && q) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

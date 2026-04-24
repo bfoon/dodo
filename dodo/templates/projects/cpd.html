@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% block title %}Reporting Cycles — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'projects:list' %}" style="color:var(--dodo-blue);text-decoration:none;">Projects</a></li>
+<li class="breadcrumb-item active">Reporting Cycles</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.year-header { font-size:0.85rem; font-weight:700; color:var(--dodo-blue); padding:.6rem .9rem; background:#f0f7ff; border-radius:10px 10px 0 0; border:1px solid #dbeafe; border-bottom:none; display:flex; align-items:center; gap:.5rem; }
+.year-block { margin-bottom:1.5rem; }
+.cycle-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:.75rem; padding:.75rem; background:#fff; border:1px solid #dbeafe; border-top:none; border-radius:0 0 10px 10px; }
+.cycle-card { border:1px solid #e2e8f0; border-radius:10px; padding:.8rem; background:#fafbfc; position:relative; transition:all .12s; }
+.cycle-card:hover { border-color:var(--dodo-blue); background:#fff; }
+.cycle-card.progress { border-left:4px solid var(--dodo-blue); }
+.cycle-card.verification { border-left:4px solid #8b5cf6; }
+.cycle-quarter { font-size:1.1rem; font-weight:700; color:#0f172a; }
+.cycle-type-label { font-size:0.68rem; text-transform:uppercase; letter-spacing:.04em; font-weight:600; padding:.15rem .45rem; border-radius:4px; }
+.cycle-type-label.progress { background:rgba(0,119,200,0.12); color:var(--dodo-blue); }
+.cycle-type-label.verification { background:rgba(139,92,246,0.12); color:#7c3aed; }
+.cycle-meta { font-size:0.74rem; color:#64748b; margin-top:.4rem; }
+.cycle-meta .label { color:#94a3b8; font-weight:600; text-transform:uppercase; font-size:0.66rem; letter-spacing:.03em; }
+.deadline-pill { display:inline-flex; align-items:center; gap:.3rem; padding:.18rem .5rem; border-radius:12px; font-size:0.72rem; font-weight:500; background:#fef3c7; color:#854d0e; }
+.deadline-pill.past { background:#f1f5f9; color:#64748b; }
+.deadline-pill.soon { background:#fee2e2; color:#991b1b; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-calendar3 me-2" style="color:var(--dodo-blue);"></i>Reporting Cycles</h1>
+    <p class="page-header-sub">Quarterly reporting windows for progress and output verification</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'projects:tracker' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-table me-1"></i>Open Tracker
+    </a>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="d-flex gap-3 align-items-center mb-3 flex-wrap" style="font-size:0.78rem;color:#475569;">
+  <div class="d-flex align-items-center gap-2">
+    <span style="width:12px;height:12px;background:var(--dodo-blue);border-radius:3px;"></span>
+    Progress Reporting
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    <span style="width:12px;height:12px;background:#8b5cf6;border-radius:3px;"></span>
+    Output Verification
+  </div>
+  <div class="ms-auto text-muted" style="font-size:0.76rem;">
+    <i class="bi bi-info-circle me-1"></i>
+    Cycles are configured by admins — contact your M&E focal point to add new ones.
+  </div>
+</div>
+
+{% regroup cycles by year as cycles_by_year %}
+
+{% for year_group in cycles_by_year %}
+<div class="year-block">
+  <div class="year-header">
+    <i class="bi bi-calendar-range"></i>
+    {{ year_group.grouper }}
+    <span class="ms-auto" style="font-size:0.72rem;font-weight:500;color:#64748b;">
+      {{ year_group.list|length }} cycle{{ year_group.list|length|pluralize }}
+    </span>
+  </div>
+  <div class="cycle-grid">
+    {% for c in year_group.list %}
+    <div class="cycle-card {{ c.cycle_type }}">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div class="cycle-quarter">{{ c.quarter }}</div>
+        <span class="cycle-type-label {{ c.cycle_type }}">{{ c.get_cycle_type_display }}</span>
+      </div>
+
+      {% if c.reporting_timeline %}
+      <div class="cycle-meta">
+        <div class="label">Reporting Timeline</div>
+        <div>{{ c.reporting_timeline }}</div>
+      </div>
+      {% endif %}
+
+      {% if c.submission_deadline %}
+      <div class="cycle-meta">
+        <div class="label">Submission Deadline</div>
+        <div>
+          <span class="deadline-pill {% if c.submission_deadline < today %}past{% endif %}">
+            <i class="bi bi-flag"></i>{{ c.submission_deadline|date:"d M Y" }}
+          </span>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if c.programme_review_dates or c.pmsu_review_dates or c.final_clearance_dates %}
+      <div class="cycle-meta">
+        <div class="label">Review Milestones</div>
+        <div style="line-height:1.6;">
+          {% if c.programme_review_dates %}<div><i class="bi bi-check2 me-1" style="color:#16a34a;"></i>Programme: {{ c.programme_review_dates }}</div>{% endif %}
+          {% if c.pmsu_review_dates %}<div><i class="bi bi-check2 me-1" style="color:#16a34a;"></i>PMSU: {{ c.pmsu_review_dates }}</div>{% endif %}
+          {% if c.final_clearance_dates %}<div><i class="bi bi-check2 me-1" style="color:#16a34a;"></i>Clearance: {{ c.final_clearance_dates }}</div>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if c.final_report_due %}
+      <div class="cycle-meta">
+        <div class="label">Final Report Due</div>
+        <div><i class="bi bi-calendar-check me-1" style="color:#dc2626;"></i>{{ c.final_report_due|date:"d M Y" }}</div>
+      </div>
+      {% endif %}
+
+      <div class="mt-2 pt-2 border-top" style="border-color:#e2e8f0;">
+        <a href="{% url 'projects:tracker' %}?year={{ c.year }}&type={{ c.cycle_type }}"
+           style="font-size:0.74rem;color:var(--dodo-blue);text-decoration:none;font-weight:500;">
+          <i class="bi bi-box-arrow-up-right me-1"></i>View in tracker
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% empty %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-calendar-x" style="font-size:2.5rem;color:#cbd5e1;"></i>
+    <h6 class="mt-2" style="font-weight:600;color:#1e293b;">No reporting cycles configured</h6>
+    <p class="text-muted" style="font-size:0.85rem;max-width:400px;margin:0.5rem auto 1rem;">
+      Reporting cycles define the quarterly windows during which projects must submit progress reports and output verifications. Ask your country office administrator to set them up.
+    </p>
+    <a href="/admin/projects/reportingcycle/" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">
+      <i class="bi bi-gear me-1"></i>Open Admin
+    </a>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

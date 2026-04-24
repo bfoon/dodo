@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block title %}Unit Heads  — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item active">Unit Heads</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-person-badge me-2" style="color:var(--dodo-blue);"></i>Heads of Unit</h1>
+    <p class="page-header-sub">Assign heads of programme units — they receive escalations and can delegate reports</p>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0" style="font-weight:600;">Current Assignments</h6>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead style="background:#f8fafc;">
+            <tr><th>User</th><th>Programme Unit</th><th>Role</th><th>Powers</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for h in heads %}
+            <tr {% if not h.is_active %}style="opacity:0.5;"{% endif %}>
+              <td>
+                <div style="font-weight:500;font-size:0.85rem;">{{ h.user.get_full_name }}</div>
+                <small class="text-muted" style="font-size:0.72rem;">{{ h.user.email }}</small>
+              </td>
+              <td>
+                <span style="display:inline-flex;align-items:center;gap:6px;">
+                  <span style="width:10px;height:10px;background:{{ h.programme_unit.color }};border-radius:3px;"></span>
+                  <span style="font-size:0.83rem;">{{ h.programme_unit.name }}</span>
+                </span>
+              </td>
+              <td>
+                {% if h.is_primary %}<span class="badge" style="background:#fef3c7;color:#92400e;font-size:0.72rem;">Head</span>
+                {% else %}<span class="badge bg-light text-dark" style="font-size:0.72rem;">Deputy</span>{% endif %}
+              </td>
+              <td style="font-size:0.75rem;">
+                {% if h.can_delegate %}<span class="badge bg-light text-dark"><i class="bi bi-arrow-left-right"></i> Delegate</span>{% endif %}
+                {% if h.can_approve %}<span class="badge bg-light text-dark"><i class="bi bi-patch-check"></i> Approve</span>{% endif %}
+              </td>
+              <td>
+                {% if h.is_active %}
+                <form method="post" style="margin:0;" onsubmit="return confirm('Revoke this assignment?')">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="revoke">
+                  <input type="hidden" name="head_id" value="{{ h.pk }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" style="border-radius:6px;font-size:0.72rem;">Revoke</button>
+                </form>
+                {% else %}
+                <span class="badge bg-secondary" style="font-size:0.7rem;">Inactive</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center py-4 text-muted">No unit heads assigned yet</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0" style="font-weight:600;"><i class="bi bi-plus-circle me-2"></i>Assign New Head</h6>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="assign">
+
+          <div class="mb-3">
+            <label class="form-label" style="font-size:0.82rem;font-weight:600;">User <span class="text-danger">*</span></label>
+            <select name="user" class="form-select" required style="border-radius:8px;">
+              <option value="">Select user...</option>
+              {% for u in users %}<option value="{{ u.pk }}">{{ u.get_full_name }} ({{ u.email }})</option>{% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" style="font-size:0.82rem;font-weight:600;">Programme Unit <span class="text-danger">*</span></label>
+            <select name="unit" class="form-select" required style="border-radius:8px;">
+              <option value="">Select unit...</option>
+              {% for u in units %}<option value="{{ u.pk }}">{{ u.name }}</option>{% endfor %}
+            </select>
+          </div>
+
+          <div class="form-check mb-2">
+            <input type="checkbox" name="is_primary" id="is_primary" class="form-check-input" checked>
+            <label for="is_primary" class="form-check-label" style="font-size:0.85rem;">Primary Head (vs. Deputy)</label>
+          </div>
+          <div class="form-check mb-2">
+            <input type="checkbox" name="can_delegate" id="can_delegate" class="form-check-input" checked>
+            <label for="can_delegate" class="form-check-label" style="font-size:0.85rem;">Can delegate report preparation</label>
+          </div>
+          <div class="form-check mb-3">
+            <input type="checkbox" name="can_approve" id="can_approve" class="form-check-input" checked>
+            <label for="can_approve" class="form-check-label" style="font-size:0.85rem;">Can approve reports</label>
+          </div>
+
+          <button type="submit" class="btn w-100" style="background:var(--dodo-blue);color:#fff;border-radius:8px;">
+            <i class="bi bi-check-lg me-1"></i>Assign
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

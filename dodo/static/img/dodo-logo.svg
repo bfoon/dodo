@@ -1,0 +1,8 @@
+<svg width="140" height="40" viewBox="0 0 140 40" xmlns="http://www.w3.org/2000/svg">
+  <!-- Circle mark -->
+  <circle cx="20" cy="20" r="18" fill="#0077c8"/>
+  <text x="20" y="26" text-anchor="middle" fill="white" font-size="15" font-weight="700" font-family="Inter, Arial" letter-spacing="-0.5">do</text>
+  <!-- Wordmark -->
+  <text x="48" y="22" fill="#1a202c" font-size="20" font-weight="700" font-family="Inter, Arial" letter-spacing="-0.5">Dodo</text>
+  <text x="48" y="34" fill="#64748b" font-size="9" font-weight="500" font-family="Inter, Arial" letter-spacing="1.5" text-transform="uppercase">M&amp;E PLATFORM</text>
+</svg>

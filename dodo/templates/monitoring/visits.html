@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% block title %}Field Visits — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'monitoring:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Monitoring</a></li>
+<li class="breadcrumb-item active">Field Visits</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.filter-bar { background:#fff; border-radius:12px; border:1px solid #e2e8f0; padding:.75rem 1rem; margin-bottom:1rem; }
+.timeline { position:relative; padding-left:2rem; }
+.timeline::before { content:''; position:absolute; left:10px; top:.5rem; bottom:.5rem; width:2px; background:#e2e8f0; }
+.visit-item { position:relative; margin-bottom:1rem; background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem 1.2rem; }
+.visit-item::before { content:''; position:absolute; left:-1.55rem; top:1.1rem; width:14px; height:14px; border-radius:50%; background:#fff; border:3px solid var(--dodo-blue); z-index:1; }
+.visit-item.type-field::before { border-color:#f59e0b; }
+.visit-item.type-remote::before { border-color:#0ea5e9; }
+.visit-item.type-desk::before { border-color:#64748b; }
+.visit-item.type-joint::before { border-color:#7c3aed; }
+.visit-head { display:flex; align-items:flex-start; gap:.75rem; flex-wrap:wrap; }
+.visit-head .date-block { text-align:center; padding:.3rem .6rem; background:#f0f7ff; border-radius:8px; min-width:56px; color:var(--dodo-blue); }
+.visit-head .date-block .day { font-size:1.1rem; font-weight:700; line-height:1; }
+.visit-head .date-block .mon { font-size:0.68rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; margin-top:.1rem; }
+.visit-head .date-block .year { font-size:0.65rem; color:#64748b; }
+.visit-info { flex-grow:1; min-width:0; }
+.visit-info .project { font-weight:600; font-size:0.9rem; color:#0f172a; }
+.visit-info .project a { color:inherit; text-decoration:none; }
+.visit-info .project a:hover { color:var(--dodo-blue); }
+.visit-info .meta { font-size:0.76rem; color:#64748b; margin-top:.25rem; display:flex; gap:.75rem; flex-wrap:wrap; }
+.visit-badges { display:flex; gap:.35rem; flex-wrap:wrap; }
+
+.section-block { margin-top:.75rem; padding-top:.75rem; border-top:1px solid #f1f5f9; font-size:0.82rem; }
+.section-block .lbl { font-size:0.68rem; text-transform:uppercase; letter-spacing:.03em; font-weight:700; color:#94a3b8; margin-bottom:.25rem; display:flex; align-items:center; gap:.3rem; }
+.section-block .body { color:#334155; line-height:1.5; white-space:pre-wrap; }
+
+.badge-type-field { background:rgba(245,158,11,0.15); color:#854d0e; font-weight:600; font-size:0.7rem; padding:.2rem .5rem; }
+.badge-type-remote { background:rgba(14,165,233,0.15); color:#0369a1; font-weight:600; font-size:0.7rem; padding:.2rem .5rem; }
+.badge-type-desk { background:rgba(100,116,139,0.15); color:#475569; font-weight:600; font-size:0.7rem; padding:.2rem .5rem; }
+.badge-type-joint { background:rgba(124,58,237,0.15); color:#5b21b6; font-weight:600; font-size:0.7rem; padding:.2rem .5rem; }
+
+.empty-state { padding:3rem 1rem; text-align:center; color:#64748b; }
+.empty-state i { font-size:2.5rem; color:#cbd5e1; display:block; margin-bottom:.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-geo-alt me-2" style="color:#f59e0b;"></i>Field Visits</h1>
+    <p class="page-header-sub">Monitoring visits with findings, recommendations, and follow-up actions</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'monitoring:create_visit' %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-plus-lg me-1"></i>Log Visit
+    </a>
+  </div>
+</div>
+
+{% if messages %}
+  {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show" style="border-radius:10px;font-size:0.85rem;">
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<div class="filter-bar d-flex gap-3 align-items-center flex-wrap">
+  <input type="search" id="visitSearch" class="form-control form-control-sm"
+         placeholder="Search project, location, or findings…"
+         style="max-width:340px;border-radius:7px;font-size:0.85rem;">
+
+  <select id="typeFilter" class="form-select form-select-sm" style="max-width:180px;border-radius:7px;font-size:0.82rem;">
+    <option value="">All types</option>
+    <option value="field">Field Visit</option>
+    <option value="remote">Remote Monitoring</option>
+    <option value="desk">Desk Review</option>
+    <option value="joint">Joint Monitoring</option>
+  </select>
+
+  <div class="ms-auto" style="font-size:0.78rem;color:#64748b;">
+    <i class="bi bi-list-ul me-1"></i><span id="visitCount">{{ visits|length }}</span> visit{{ visits|length|pluralize }}
+  </div>
+</div>
+
+{% if visits %}
+<div class="timeline">
+  {% for v in visits %}
+  <div class="visit-item type-{{ v.visit_type }}"
+       data-search="{{ v.project.title|lower }} {{ v.location|lower }} {{ v.purpose|lower }} {{ v.findings|lower }}"
+       data-type="{{ v.visit_type }}">
+    <div class="visit-head">
+      <div class="date-block">
+        <div class="day">{{ v.visit_date|date:"d" }}</div>
+        <div class="mon">{{ v.visit_date|date:"M" }}</div>
+        <div class="year">{{ v.visit_date|date:"Y" }}</div>
+      </div>
+
+      <div class="visit-info">
+        <div class="project">
+          <a href="{% url 'projects:detail' v.project.pk %}">
+            {% if v.project.pims_id %}<span style="font-size:0.72rem;color:#94a3b8;font-weight:400;">{{ v.project.pims_id }} · </span>{% endif %}
+            {{ v.project.display_title }}
+          </a>
+        </div>
+        <div class="meta">
+          {% if v.location %}
+            <span><i class="bi bi-pin-map me-1" style="color:#f59e0b;"></i>{{ v.location }}</span>
+          {% endif %}
+          {% if v.conducted_by.all %}
+            <span>
+              <i class="bi bi-people me-1" style="color:#94a3b8;"></i>
+              {% for u in v.conducted_by.all %}{{ u.get_full_name|default:u.email }}{% if not forloop.last %}, {% endif %}{% endfor %}
+            </span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="visit-badges">
+        <span class="badge badge-type-{{ v.visit_type }}">{{ v.get_visit_type_display }}</span>
+      </div>
+    </div>
+
+    {% if v.purpose %}
+    <div class="section-block">
+      <div class="lbl"><i class="bi bi-bullseye"></i>Purpose</div>
+      <div class="body">{{ v.purpose }}</div>
+    </div>
+    {% endif %}
+
+    {% if v.findings %}
+    <div class="section-block">
+      <div class="lbl" style="color:var(--dodo-blue);"><i class="bi bi-search"></i>Findings</div>
+      <div class="body">{{ v.findings }}</div>
+    </div>
+    {% endif %}
+
+    {% if v.recommendations %}
+    <div class="section-block">
+      <div class="lbl" style="color:#16a34a;"><i class="bi bi-lightbulb"></i>Recommendations</div>
+      <div class="body">{{ v.recommendations }}</div>
+    </div>
+    {% endif %}
+
+    {% if v.follow_up_actions %}
+    <div class="section-block">
+      <div class="lbl" style="color:#f59e0b;"><i class="bi bi-arrow-repeat"></i>Follow-up Actions</div>
+      <div class="body">{{ v.follow_up_actions }}</div>
+    </div>
+    {% endif %}
+
+    {% if v.attachments %}
+    <div class="section-block">
+      <a href="{{ v.attachments.url }}" target="_blank" rel="noopener"
+         style="font-size:0.8rem;color:var(--dodo-blue);text-decoration:none;">
+        <i class="bi bi-paperclip me-1"></i>View attachment
+      </a>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <i class="bi bi-geo-alt"></i>
+    <h6 style="font-weight:600;color:#1e293b;">No visits logged yet</h6>
+    <p style="font-size:0.85rem;max-width:420px;margin:.5rem auto 1rem;">
+      Log field visits, remote monitoring sessions, desk reviews, or joint monitoring
+      missions to capture findings, recommendations, and follow-up actions.
+    </p>
+    <a href="{% url 'monitoring:create_visit' %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;">
+      <i class="bi bi-plus-lg me-1"></i>Log First Visit
+    </a>
+  </div>
+</div>
+{% endif %}
+
+<div id="noResults" class="card mt-3" style="display:none;">
+  <div class="empty-state" style="padding:1.5rem;">
+    <i class="bi bi-search" style="font-size:1.5rem;"></i>
+    <div style="font-size:0.85rem;">No visits match your filters.</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const search = document.getElementById('visitSearch');
+const typeFilter = document.getElementById('typeFilter');
+const noResults = document.getElementById('noResults');
+const count = document.getElementById('visitCount');
+
+function applyFilter() {
+  const q = (search.value || '').trim().toLowerCase();
+  const t = typeFilter.value;
+  let visible = 0;
+  document.querySelectorAll('.visit-item').forEach(el => {
+    const hay = el.dataset.search || '';
+    const matchesSearch = !q || hay.indexOf(q) !== -1;
+    const matchesType = !t || el.dataset.type === t;
+    const show = matchesSearch && matchesType;
+    el.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  count.textContent = visible;
+  const hasAny = document.querySelectorAll('.visit-item').length > 0;
+  noResults.style.display = (hasAny && visible === 0) ? '' : 'none';
+}
+
+search?.addEventListener('input', applyFilter);
+typeFilter?.addEventListener('change', applyFilter);
+</script>
+{% endblock %}

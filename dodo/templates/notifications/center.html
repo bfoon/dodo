@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block title %}Notifications  — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item active">Notifications</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-bell me-2" style="color:var(--dodo-blue);"></i>Notifications</h1>
+    <p class="page-header-sub">{{ unread_count }} unread notification{{ unread_count|pluralize }}</p>
+  </div>
+  {% if unread_count %}
+  <form method="post" action="{% url 'notifications:mark_all_read' %}" style="margin:0;">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm btn-outline-primary" style="border-radius:8px;">
+      <i class="bi bi-check2-all me-1"></i>Mark all read
+    </button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="?type=all" class="btn btn-sm {% if filter_type == 'all' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;font-size:0.78rem;">All</a>
+      <a href="?type=unread" class="btn btn-sm {% if filter_type == 'unread' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;font-size:0.78rem;">Unread</a>
+      <a href="?type=reminder" class="btn btn-sm {% if filter_type == 'reminder' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;font-size:0.78rem;">Reminders</a>
+      <a href="?type=overdue" class="btn btn-sm {% if filter_type == 'overdue' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;font-size:0.78rem;">Overdue</a>
+      <a href="?type=escalation" class="btn btn-sm {% if filter_type == 'escalation' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;font-size:0.78rem;">Escalations</a>
+      <a href="?type=delegation" class="btn btn-sm {% if filter_type == 'delegation' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;font-size:0.78rem;">Delegations</a>
+      <a href="?type=approval" class="btn btn-sm {% if filter_type == 'approval' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;font-size:0.78rem;">Approvals</a>
+      <a href="?type=access_granted" class="btn btn-sm {% if filter_type == 'access_granted' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;font-size:0.78rem;">Access Changes</a>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% for n in notifications %}
+    <div class="d-flex gap-3 p-3 border-bottom align-items-start {% if not n.is_read %}bg-info-subtle{% endif %}" style="{% if not n.is_read %}background:#f0f9ff;{% endif %}">
+      <div style="flex-shrink:0;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:{% if n.priority == 'critical' %}#fee2e2;color:#991b1b{% elif n.priority == 'high' %}#fef3c7;color:#92400e{% else %}#dbeafe;color:#1e40af{% endif %};">
+        <i class="bi bi-{% if n.notification_type == 'reminder' %}alarm{% elif n.notification_type == 'overdue' or n.notification_type == 'escalation' %}exclamation-triangle{% elif n.notification_type == 'delegation' %}arrow-left-right{% elif n.notification_type == 'approval' %}patch-check{% elif n.notification_type == 'access_granted' %}key{% else %}bell{% endif %}"></i>
+      </div>
+      <div style="flex:1;">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <strong style="color:#1a202c;font-size:0.9rem;">{{ n.title }}</strong>
+          {% if n.priority == 'critical' %}<span class="badge bg-danger" style="font-size:0.65rem;">Critical</span>
+          {% elif n.priority == 'high' %}<span class="badge" style="background:#fef3c7;color:#92400e;font-size:0.65rem;">High Priority</span>{% endif %}
+          {% if not n.is_read %}<span class="badge bg-primary" style="font-size:0.65rem;">New</span>{% endif %}
+        </div>
+        <div style="color:#475569;font-size:0.85rem;margin-top:4px;white-space:pre-line;">{{ n.message }}</div>
+        <div class="d-flex gap-2 align-items-center mt-2">
+          <small style="color:#94a3b8;font-size:0.72rem;"><i class="bi bi-clock me-1"></i>{{ n.created_at|timesince }} ago</small>
+          {% if n.related_project %}
+          <small style="color:#94a3b8;font-size:0.72rem;">·</small>
+          <small><a href="{% url 'projects:detail' n.related_project.pk %}" style="color:var(--dodo-blue);text-decoration:none;font-size:0.72rem;">{{ n.related_project.display_title }}</a></small>
+          {% endif %}
+          {% if n.email_sent %}
+          <small style="color:#94a3b8;font-size:0.72rem;">·</small>
+          <small style="color:#10b981;font-size:0.72rem;"><i class="bi bi-envelope-check me-1"></i>Emailed</small>
+          {% endif %}
+        </div>
+      </div>
+      <div class="d-flex flex-column gap-1">
+        {% if n.action_url %}
+        <a href="{{ n.action_url }}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:6px;font-size:0.75rem;">Open</a>
+        {% endif %}
+        {% if not n.is_read %}
+        <form method="post" action="{% url 'notifications:mark_read' n.pk %}" style="margin:0;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline-secondary" style="border-radius:6px;font-size:0.72rem;">Mark read</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% empty %}
+    <div class="text-center py-5">
+      <i class="bi bi-bell-slash fs-1 mb-3 d-block" style="color:#cbd5e1;"></i>
+      <h6 style="color:#475569;">No notifications</h6>
+      <p class="text-muted" style="font-size:0.85rem;">You're all caught up</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+# UNDP M&E Platform — Python dependencies
+
+# Django
+Django>=4.2,<5.0
+django-crispy-forms>=2.1
+crispy-bootstrap5>=2023.10
+django-filter>=23.5
+Pillow>=10.0
+
+# Database
+psycopg2-binary>=2.9.9
+
+# Static files
+whitenoise>=6.6.0
+
+# Production server
+gunicorn>=21.2.0
+
+# Celery (async tasks + scheduled reminders)
+celery>=5.3.4
+redis>=5.0.0
+django-celery-beat>=2.5.0
+django-celery-results>=2.5.1
+
+# Excel import / export
+openpyxl>=3.1.2
+
+# Utilities
+python-dateutil>=2.8.2
