@@ -18,6 +18,42 @@
 .q-type-badge { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 20px; background: var(--dodo-blue-light); color: var(--dodo-blue); font-weight: 600; }
 .q-actions { position: absolute; top: 0.75rem; right: 0.75rem; display: flex; gap: 0.25rem; }
 .add-q-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; position: sticky; top: calc(var(--topbar-height) + 1rem); }
+
+/* Drag-and-drop affordances */
+.q-card { cursor: default; }
+.q-card .drag-handle {
+  position: absolute; top: 0.5rem; left: 0.5rem;
+  width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+  color: #cbd5e1; cursor: grab; border-radius: 4px; transition: all 0.12s;
+  user-select: none;
+}
+.q-card:hover .drag-handle { color: #94a3b8; }
+.q-card .drag-handle:hover { background: #f1f5f9; color: var(--dodo-blue); }
+.q-card .drag-handle:active { cursor: grabbing; }
+.q-card.dragging { opacity: 0.4; border-style: dashed; border-color: var(--dodo-blue); }
+.q-card.drop-above { border-top: 3px solid var(--dodo-blue); margin-top: calc(-3px + 0.75rem); }
+.q-card.drop-below { border-bottom: 3px solid var(--dodo-blue); margin-bottom: calc(-3px + 0.75rem); }
+.q-card .q-content { padding-left: 1.5rem; }
+
+/* Save indicator */
+.reorder-indicator {
+  position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 1050;
+  padding: 0.6rem 1rem; border-radius: 10px; font-size: 0.82rem;
+  font-weight: 500; box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+  display: none; align-items: center; gap: 0.5rem;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.reorder-indicator.show { display: inline-flex; }
+.reorder-indicator.saving { background: #fff; color: var(--dodo-blue); border: 1px solid #bae6fd; }
+.reorder-indicator.saved { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+.reorder-indicator.error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+.reorder-indicator .spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
 .qtype-option { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.65rem; border: 1.5px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 0.78rem; transition: all 0.15s; }
 .qtype-option:hover, .qtype-option.active { border-color: var(--dodo-blue); background: var(--dodo-blue-light); color: var(--dodo-blue); }
 .qtype-option input[type=radio] { display: none; }
@@ -87,13 +123,22 @@
       <h6 class="mb-0" style="font-weight:600;color:#374151;">
         Questions <span class="badge" style="background:#e2e8f0;color:#64748b;">{{ questions|length }}</span>
       </h6>
+      {% if questions|length > 1 %}
+      <span style="font-size:0.74rem;color:#94a3b8;">
+        <i class="bi bi-grip-vertical me-1"></i>Drag to reorder
+      </span>
+      {% endif %}
     </div>
 
+    <div id="questionsList">
     {% for q in questions %}
-    <div class="q-card">
-      <div class="d-flex gap-2">
+    <div class="q-card" draggable="true" data-question-id="{{ q.pk }}">
+      <span class="drag-handle" title="Drag to reorder">
+        <i class="bi bi-grip-vertical"></i>
+      </span>
+      <div class="d-flex gap-2 q-content">
         <div style="flex:1;">
-          <div class="q-number">Question {{ q.order }}</div>
+          <div class="q-number">Question <span class="q-order">{{ q.order }}</span></div>
           <div class="q-text">{{ q.text }}{% if q.is_required %}<span class="text-danger ms-1">*</span>{% endif %}</div>
           {% if q.description %}<div class="q-desc">{{ q.description }}</div>{% endif %}
           <div class="mt-2 d-flex gap-2 align-items-center flex-wrap">
@@ -131,6 +176,12 @@
       <div style="font-size:0.85rem;">No questions yet — add your first question from the panel</div>
     </div>
     {% endfor %}
+    </div>
+
+    <!-- Reorder save indicator -->
+    <div class="reorder-indicator" id="reorderIndicator">
+      <span class="status-content"></span>
+    </div>
   </div>
 
   <!-- Add Question Panel -->
@@ -230,6 +281,144 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('input[name=question_type]').forEach(el => {
     el.addEventListener('change', () => updateTypeUI(el.value));
   });
+
+  initDragAndDrop();
 });
+
+// ---------- Drag & drop reordering ----------
+function initDragAndDrop() {
+  const list = document.getElementById('questionsList');
+  if (!list) return;
+
+  const reorderUrl = "{% url 'surveys:reorder_questions' survey.pk %}";
+  const csrfToken = (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value;
+  const indicator = document.getElementById('reorderIndicator');
+
+  let draggingEl = null;
+
+  function clearDropMarkers() {
+    list.querySelectorAll('.q-card').forEach(c => {
+      c.classList.remove('drop-above', 'drop-below');
+    });
+  }
+
+  function showStatus(state, text) {
+    if (!indicator) return;
+    indicator.classList.remove('saving', 'saved', 'error');
+    indicator.classList.add('show', state);
+    const iconHtml = state === 'saving'
+      ? '<span class="spinner"></span>'
+      : (state === 'saved' ? '<i class="bi bi-check-circle-fill"></i>' : '<i class="bi bi-exclamation-circle-fill"></i>');
+    indicator.querySelector('.status-content').innerHTML = `${iconHtml}<span>${text}</span>`;
+    if (state !== 'saving') {
+      setTimeout(() => indicator.classList.remove('show'), 1800);
+    }
+  }
+
+  function getCurrentOrder() {
+    return Array.from(list.querySelectorAll('.q-card[data-question-id]'))
+      .map(el => parseInt(el.dataset.questionId, 10));
+  }
+
+  function renumberInPlace() {
+    list.querySelectorAll('.q-card[data-question-id]').forEach((card, idx) => {
+      const slot = card.querySelector('.q-order');
+      if (slot) slot.textContent = idx + 1;
+    });
+  }
+
+  // Wire each card
+  list.querySelectorAll('.q-card[data-question-id]').forEach(card => {
+    card.addEventListener('dragstart', e => {
+      draggingEl = card;
+      card.classList.add('dragging');
+      // Required for Firefox
+      try { e.dataTransfer.setData('text/plain', card.dataset.questionId); } catch(_) {}
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      clearDropMarkers();
+      draggingEl = null;
+    });
+
+    card.addEventListener('dragover', e => {
+      if (!draggingEl || draggingEl === card) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      // Decide above/below based on cursor Y
+      const rect = card.getBoundingClientRect();
+      const isAbove = (e.clientY - rect.top) < rect.height / 2;
+      clearDropMarkers();
+      card.classList.add(isAbove ? 'drop-above' : 'drop-below');
+    });
+
+    card.addEventListener('dragleave', () => {
+      card.classList.remove('drop-above', 'drop-below');
+    });
+
+    card.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!draggingEl || draggingEl === card) {
+        clearDropMarkers();
+        return;
+      }
+      const isAbove = card.classList.contains('drop-above');
+      clearDropMarkers();
+
+      // Capture the previous order so we can roll back on failure
+      const before = getCurrentOrder();
+
+      // Move in the DOM
+      if (isAbove) {
+        list.insertBefore(draggingEl, card);
+      } else {
+        list.insertBefore(draggingEl, card.nextSibling);
+      }
+
+      const after = getCurrentOrder();
+      if (after.join(',') === before.join(',')) return;  // no-op
+
+      renumberInPlace();
+      saveOrder(after, before);
+    });
+  });
+
+  function saveOrder(newOrder, previousOrder) {
+    showStatus('saving', 'Saving order…');
+    fetch(reorderUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify({ order: newOrder }),
+    })
+    .then(resp => {
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return resp.json();
+    })
+    .then(data => {
+      if (!data || !data.ok) throw new Error(data && data.error ? data.error : 'Save failed');
+      showStatus('saved', 'Order saved');
+    })
+    .catch(err => {
+      console.error('Reorder failed:', err);
+      // Roll back the DOM to the pre-drag state
+      const cards = Object.fromEntries(
+        Array.from(list.querySelectorAll('.q-card[data-question-id]'))
+          .map(el => [parseInt(el.dataset.questionId, 10), el])
+      );
+      previousOrder.forEach(id => {
+        if (cards[id]) list.appendChild(cards[id]);
+      });
+      renumberInPlace();
+      showStatus('error', 'Could not save — reverted');
+    });
+  }
+}
 </script>
 {% endblock %}

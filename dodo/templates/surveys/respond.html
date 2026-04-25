@@ -6,6 +6,45 @@
 {% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<style>
+.geo-widget { margin-top:.25rem; }
+.geo-toolbar { display:flex; gap:.4rem; margin-bottom:.5rem; flex-wrap:wrap; }
+.geo-toolbar .btn { font-size:0.78rem; border-radius:7px; padding:.3rem .65rem; display:inline-flex; align-items:center; gap:.35rem; }
+.geo-toolbar .btn-locate { background:var(--dodo-blue); color:#fff; border:1px solid var(--dodo-blue); }
+.geo-toolbar .btn-locate:hover { background:#005ea0; color:#fff; }
+.geo-toolbar .btn-ip { background:#fff; color:#475569; border:1px solid #e2e8f0; }
+.geo-toolbar .btn-ip:hover { border-color:var(--dodo-blue); color:var(--dodo-blue); }
+.geo-toolbar .btn-clear { background:transparent; color:#94a3b8; border:1px solid transparent; }
+.geo-toolbar .btn-clear:hover { color:#dc2626; }
+.geo-toolbar .btn .spinner {
+  width:12px; height:12px; border-radius:50%;
+  border:2px solid currentColor; border-right-color:transparent;
+  animation:geospin .7s linear infinite;
+}
+@keyframes geospin { to { transform:rotate(360deg); } }
+.geo-status { font-size:0.74rem; color:#64748b; margin:.25rem 0 .5rem; min-height:1.1em; }
+.geo-status.ok { color:#16a34a; }
+.geo-status.err { color:#dc2626; }
+.geo-map {
+  height:220px; border-radius:10px; border:1px solid #e2e8f0;
+  margin-top:.5rem; background:#f8fafc;
+  position:relative; overflow:hidden;
+}
+.geo-map.placeholder::before {
+  content:'\F1B8';
+  font-family:'bootstrap-icons';
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  font-size:2.5rem; color:#cbd5e1;
+}
+.geo-map.placeholder::after {
+  content:'Click "Use GPS" or enter coordinates to show map';
+  position:absolute; top:calc(50% + 28px); left:50%; transform:translateX(-50%);
+  font-size:0.78rem; color:#94a3b8; white-space:nowrap;
+}
+.geo-coords-row { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; }
+@media (max-width:480px) { .geo-coords-row { grid-template-columns:1fr; } }
+</style>
 <style>
 .respond-wrap { max-width:760px; margin:0 auto; }
 .intro-card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:1.5rem 1.75rem; margin-bottom:1rem; border-top:4px solid var(--dodo-blue); }
@@ -284,18 +323,31 @@ textarea.form-control { min-height:90px; }
           </div>
 
         {% elif q.question_type == 'geo' %}
-          <div class="row g-2">
-            <div class="col-sm-6">
+          <div class="geo-widget" data-geo-widget="{{ q.pk }}">
+            <div class="geo-toolbar">
+              <button type="button" class="btn btn-locate" data-action="gps">
+                <i class="bi bi-geo-alt-fill"></i><span>Use GPS</span>
+              </button>
+              <button type="button" class="btn btn-ip" data-action="ip">
+                <i class="bi bi-globe2"></i><span>Approximate (IP)</span>
+              </button>
+              <button type="button" class="btn btn-clear" data-action="clear" style="margin-left:auto;">
+                <i class="bi bi-x-circle"></i>Clear
+              </button>
+            </div>
+            <div class="geo-status" data-geo-status></div>
+
+            <div class="geo-coords-row">
               <input type="text" name="q_{{ q.pk }}_lat" class="form-control" placeholder="Latitude"
-                     pattern="-?\d+(\.\d+)?">
-            </div>
-            <div class="col-sm-6">
+                     pattern="-?\d+(\.\d+)?" data-geo-lat>
               <input type="text" name="q_{{ q.pk }}_lng" class="form-control" placeholder="Longitude"
-                     pattern="-?\d+(\.\d+)?">
+                     pattern="-?\d+(\.\d+)?" data-geo-lng>
             </div>
-            <div class="col-12">
-              <input type="text" name="q_{{ q.pk }}" class="form-control" placeholder="Place name / address">
-            </div>
+            <input type="text" name="q_{{ q.pk }}" class="form-control mt-2"
+                   placeholder="Place name / address (auto-fills, you can edit)"
+                   data-geo-place>
+
+            <div class="geo-map placeholder" id="geo_map_{{ q.pk }}" data-geo-map></div>
           </div>
 
         {% elif q.question_type == 'ranking' %}
@@ -351,7 +403,186 @@ textarea.form-control { min-height:90px; }
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
+// ---------- Geo question widgets ----------
+function initGeoWidgets() {
+  if (typeof L === 'undefined') return;  // Leaflet failed to load
+  document.querySelectorAll('[data-geo-widget]').forEach(setupGeoWidget);
+}
+
+function setupGeoWidget(wrapper) {
+  const latInput = wrapper.querySelector('[data-geo-lat]');
+  const lngInput = wrapper.querySelector('[data-geo-lng]');
+  const placeInput = wrapper.querySelector('[data-geo-place]');
+  const statusEl = wrapper.querySelector('[data-geo-status]');
+  const mapEl = wrapper.querySelector('[data-geo-map]');
+  let map = null;
+  let marker = null;
+
+  function setStatus(text, level = '') {
+    statusEl.textContent = text;
+    statusEl.className = 'geo-status' + (level ? ' ' + level : '');
+  }
+
+  function ensureMap() {
+    if (map) return map;
+    mapEl.classList.remove('placeholder');
+    map = L.map(mapEl, { zoomControl: true, attributionControl: true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap',
+      maxZoom: 19,
+    }).addTo(map);
+    return map;
+  }
+
+  function updateMap(lat, lng, zoom = 15) {
+    const m = ensureMap();
+    const latLng = [lat, lng];
+    if (!marker) {
+      marker = L.marker(latLng, { draggable: true }).addTo(m);
+      marker.on('dragend', () => {
+        const ll = marker.getLatLng();
+        latInput.value = ll.lat.toFixed(6);
+        lngInput.value = ll.lng.toFixed(6);
+        setStatus('Pin moved — coordinates updated.', 'ok');
+        reverseGeocode(ll.lat, ll.lng);
+      });
+    } else {
+      marker.setLatLng(latLng);
+    }
+    m.setView(latLng, zoom);
+    // Map needs a size invalidation when it was hidden / freshly shown
+    setTimeout(() => m.invalidateSize(), 50);
+  }
+
+  function reverseGeocode(lat, lng) {
+    if (placeInput.dataset.userEdited === '1') return;  // Don't overwrite user typing
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`, {
+      headers: { 'Accept': 'application/json' },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data && data.display_name && placeInput.dataset.userEdited !== '1') {
+          placeInput.value = data.display_name;
+        }
+      })
+      .catch(() => {/* silent */});
+  }
+
+  // GPS button
+  wrapper.querySelector('[data-action="gps"]').addEventListener('click', function() {
+    const btn = this;
+    if (!navigator.geolocation) {
+      setStatus('Your browser doesn\'t support GPS. Try the IP option.', 'err');
+      return;
+    }
+    btn.disabled = true;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner"></span><span>Locating…</span>';
+    setStatus('Requesting GPS — please allow location access if prompted.');
+
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        btn.disabled = false; btn.innerHTML = orig;
+        const { latitude, longitude, accuracy } = pos.coords;
+        latInput.value = latitude.toFixed(6);
+        lngInput.value = longitude.toFixed(6);
+        updateMap(latitude, longitude, 16);
+        const accStr = accuracy < 1000
+          ? `±${Math.round(accuracy)} m`
+          : `±${(accuracy / 1000).toFixed(1)} km`;
+        setStatus(`Location set via GPS (${accStr}). Drag the pin to fine-tune.`, 'ok');
+        reverseGeocode(latitude, longitude);
+      },
+      err => {
+        btn.disabled = false; btn.innerHTML = orig;
+        const messages = {
+          1: 'Permission denied — enable location access in your browser settings.',
+          2: 'GPS unavailable on this device. Try the IP option.',
+          3: 'GPS request timed out. Try again or use IP.',
+        };
+        setStatus(messages[err.code] || ('GPS error: ' + err.message), 'err');
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  });
+
+  // IP button
+  wrapper.querySelector('[data-action="ip"]').addEventListener('click', function() {
+    const btn = this;
+    btn.disabled = true;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner"></span><span>Locating…</span>';
+    setStatus('Looking up location from IP address…');
+
+    fetch('https://ipapi.co/json/')
+      .then(r => r.ok ? r.json() : Promise.reject('lookup failed'))
+      .then(data => {
+        btn.disabled = false; btn.innerHTML = orig;
+        if (data && data.latitude && data.longitude) {
+          latInput.value = Number(data.latitude).toFixed(6);
+          lngInput.value = Number(data.longitude).toFixed(6);
+          updateMap(data.latitude, data.longitude, 11);
+          const cityCountry = [data.city, data.country_name].filter(Boolean).join(', ');
+          if (cityCountry && placeInput.dataset.userEdited !== '1') {
+            placeInput.value = cityCountry;
+          }
+          setStatus('Approximate location set from IP — accurate to city level. Drag pin or use GPS for precision.', 'ok');
+        } else {
+          setStatus('Could not determine location from IP.', 'err');
+        }
+      })
+      .catch(() => {
+        btn.disabled = false; btn.innerHTML = orig;
+        setStatus('IP lookup failed — try GPS or enter coordinates manually.', 'err');
+      });
+  });
+
+  // Clear button
+  wrapper.querySelector('[data-action="clear"]').addEventListener('click', function() {
+    latInput.value = '';
+    lngInput.value = '';
+    placeInput.value = '';
+    placeInput.dataset.userEdited = '';
+    if (marker) { marker.remove(); marker = null; }
+    if (map) { map.remove(); map = null; }
+    mapEl.classList.add('placeholder');
+    mapEl.innerHTML = '';
+    setStatus('');
+  });
+
+  // Manual lat/lng entry → update map
+  function syncFromInputs() {
+    const lat = parseFloat(latInput.value);
+    const lng = parseFloat(lngInput.value);
+    if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      updateMap(lat, lng, 13);
+    }
+  }
+  let manualTimer = null;
+  [latInput, lngInput].forEach(el => {
+    el.addEventListener('change', syncFromInputs);
+    el.addEventListener('input', () => {
+      clearTimeout(manualTimer);
+      manualTimer = setTimeout(syncFromInputs, 600);
+    });
+  });
+
+  // Track whether user has manually edited the place field (so reverse geocode won't clobber)
+  placeInput.addEventListener('input', () => {
+    placeInput.dataset.userEdited = placeInput.value.trim() ? '1' : '';
+  });
+
+  // If the form was loaded with pre-existing coords (rare but possible), show map immediately
+  if (latInput.value && lngInput.value) {
+    syncFromInputs();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', initGeoWidgets);
+
+// ---------- Existing respond.html JS continues below ----------
 // Highlight selected choice items
 document.querySelectorAll('.choice-item').forEach(label => {
   const input = label.querySelector('input');

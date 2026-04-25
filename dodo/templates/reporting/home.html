@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+{% block title %}Reporting — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Home</a></li>
+<li class="breadcrumb-item active">Reporting</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.stat-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem 1.1rem; }
+.stat-card .lbl { font-size:0.7rem; text-transform:uppercase; letter-spacing:.04em; font-weight:600; color:#64748b; }
+.stat-card .val { font-size:1.7rem; font-weight:700; color:#0f172a; line-height:1.1; margin-top:.2rem; }
+.stat-card .sub { font-size:0.72rem; color:#94a3b8; margin-top:.15rem; }
+.stat-card .ico { width:40px; height:40px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-size:1.1rem; }
+
+.report-card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:1.25rem 1.4rem; text-decoration:none; color:inherit; display:flex; gap:1rem; align-items:flex-start; height:100%; transition:all .15s ease; }
+.report-card:hover { border-color:var(--dodo-blue); box-shadow:0 4px 16px rgba(0,119,200,0.08); transform:translateY(-1px); color:inherit; }
+.report-card .ico { width:48px; height:48px; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; font-size:1.35rem; flex-shrink:0; }
+.report-card .info { flex-grow:1; min-width:0; }
+.report-card h5 { font-weight:700; color:#0f172a; font-size:1rem; margin-bottom:.3rem; display:flex; align-items:center; gap:.5rem; }
+.report-card p { font-size:0.83rem; color:#64748b; margin-bottom:.5rem; line-height:1.5; }
+.report-card .actions { display:flex; gap:.5rem; align-items:center; font-size:0.78rem; color:var(--dodo-blue); font-weight:500; }
+.report-card .actions .divider { width:1px; height:12px; background:#e2e8f0; }
+.export-link { font-size:0.74rem; color:#64748b; text-decoration:none; display:inline-flex; align-items:center; gap:.25rem; }
+.export-link:hover { color:var(--dodo-blue); }
+
+.quick-tip { background:linear-gradient(135deg, rgba(0,119,200,0.06) 0%, rgba(0,119,200,0.02) 100%); border:1px solid #bae6fd; border-radius:12px; padding:1rem 1.25rem; margin-top:1.25rem; }
+.quick-tip h6 { font-weight:700; color:var(--dodo-blue); font-size:0.82rem; text-transform:uppercase; letter-spacing:.04em; margin-bottom:.4rem; }
+.quick-tip p { font-size:0.85rem; color:#475569; margin-bottom:0; line-height:1.55; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-file-earmark-bar-graph me-2" style="color:var(--dodo-blue);"></i>Reporting</h1>
+    <p class="page-header-sub">Aggregate reports across projects, cycles, and indicators — with CSV export</p>
+  </div>
+</div>
+
+<!-- Stats strip -->
+<div class="row g-3 mb-3">
+  <div class="col-md-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="lbl">Active Projects</div>
+          <div class="val">{{ stats.active_projects|default:0 }}</div>
+          <div class="sub">In reporting scope</div>
+        </div>
+        <div class="ico" style="background:rgba(0,119,200,0.12);color:var(--dodo-blue);">
+          <i class="bi bi-folder2-open"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="lbl">This Quarter</div>
+          <div class="val">{{ stats.submitted_this_q|default:0 }}/{{ stats.reports_this_q|default:0 }}</div>
+          <div class="sub">Reports submitted</div>
+        </div>
+        <div class="ico" style="background:rgba(22,163,74,0.12);color:#16a34a;">
+          <i class="bi bi-check2-circle"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="lbl">Verifications</div>
+          <div class="val">{{ stats.verifications_completed|default:0 }}</div>
+          <div class="sub">{{ stats.verifications_total|default:0 }} total · {{ stats.verifications_pending|default:0 }} in progress</div>
+        </div>
+        <div class="ico" style="background:rgba(124,58,237,0.12);color:#7c3aed;">
+          <i class="bi bi-shield-check"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="lbl">CPD Indicators</div>
+          <div class="val">{{ stats.indicators_with_data|default:0 }}/{{ stats.indicators_total|default:0 }}</div>
+          <div class="sub">With recent data</div>
+        </div>
+        <div class="ico" style="background:rgba(245,158,11,0.12);color:#f59e0b;">
+          <i class="bi bi-graph-up"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Report types -->
+<h6 style="font-weight:700;color:#0f172a;font-size:0.88rem;margin-top:1.5rem;margin-bottom:.75rem;">
+  Reports
+</h6>
+<div class="row g-3">
+  <div class="col-md-6">
+    <a href="{% url 'reporting:progress' %}" class="report-card">
+      <div class="ico" style="background:rgba(0,119,200,0.12);color:var(--dodo-blue);">
+        <i class="bi bi-bar-chart-line-fill"></i>
+      </div>
+      <div class="info">
+        <h5>Progress Report <i class="bi bi-arrow-right-short" style="font-size:1.2rem;color:#94a3b8;"></i></h5>
+        <p>Quarterly progress reporting status for every project — submitted, pending, overdue. Pick a year and quarter to drill in.</p>
+        <div class="actions">
+          <span><i class="bi bi-eye me-1"></i>Open report</span>
+          <span class="divider"></span>
+          <a href="{% url 'reporting:export' 'progress' %}" class="export-link" onclick="event.stopPropagation();">
+            <i class="bi bi-download"></i>CSV
+          </a>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <div class="col-md-6">
+    <a href="{% url 'reporting:verification' %}" class="report-card">
+      <div class="ico" style="background:rgba(22,163,74,0.12);color:#16a34a;">
+        <i class="bi bi-shield-check"></i>
+      </div>
+      <div class="info">
+        <h5>Output Verification <i class="bi bi-arrow-right-short" style="font-size:1.2rem;color:#94a3b8;"></i></h5>
+        <p>Verification status per project and cycle — field, documentation review, validation meetings, and final clearance.</p>
+        <div class="actions">
+          <span><i class="bi bi-eye me-1"></i>Open report</span>
+          <span class="divider"></span>
+          <a href="{% url 'reporting:export' 'verification' %}" class="export-link" onclick="event.stopPropagation();">
+            <i class="bi bi-download"></i>CSV
+          </a>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <div class="col-md-6">
+    <a href="{% url 'reporting:indicators' %}" class="report-card">
+      <div class="ico" style="background:rgba(124,58,237,0.12);color:#7c3aed;">
+        <i class="bi bi-graph-up-arrow"></i>
+      </div>
+      <div class="info">
+        <h5>Indicator Achievements <i class="bi bi-arrow-right-short" style="font-size:1.2rem;color:#94a3b8;"></i></h5>
+        <p>CPD indicator results by quarter, against baseline and end target. Tracks your programme's delivery against the framework.</p>
+        <div class="actions">
+          <span><i class="bi bi-eye me-1"></i>Open report</span>
+          <span class="divider"></span>
+          <a href="{% url 'reporting:export' 'indicators' %}" class="export-link" onclick="event.stopPropagation();">
+            <i class="bi bi-download"></i>CSV
+          </a>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <div class="col-md-6">
+    <a href="{% url 'reporting:donor' %}" class="report-card">
+      <div class="ico" style="background:rgba(245,158,11,0.12);color:#f59e0b;">
+        <i class="bi bi-briefcase"></i>
+      </div>
+      <div class="info">
+        <h5>Donor Reporting <i class="bi bi-arrow-right-short" style="font-size:1.2rem;color:#94a3b8;"></i></h5>
+        <p>Upcoming donor deadlines, reporting frequencies, and milestones. See where internal drafts and reviews sit across your portfolio.</p>
+        <div class="actions">
+          <span><i class="bi bi-eye me-1"></i>Open report</span>
+          <span class="divider"></span>
+          <a href="{% url 'reporting:export' 'donor' %}" class="export-link" onclick="event.stopPropagation();">
+            <i class="bi bi-download"></i>CSV
+          </a>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<div class="quick-tip">
+  <h6><i class="bi bi-lightbulb me-1"></i>Tip</h6>
+  <p>
+    All reports support CSV export for use in Excel, Power BI, or Google Sheets. For live tracker-style interaction,
+    the <a href="{% url 'projects:tracker' %}" style="color:var(--dodo-blue);font-weight:500;text-decoration:none;">Projects Tracker</a>
+    lets you update statuses inline. For one-off data collection, the
+    <a href="{% url 'surveys:list' %}" style="color:var(--dodo-blue);font-weight:500;text-decoration:none;">Surveys</a> module is a better fit.
+  </p>
+</div>
+{% endblock %}

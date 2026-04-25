@@ -1,0 +1,240 @@
+{% extends 'base.html' %}
+{% block title %}Indicator Achievements Report — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'reporting:home' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Reporting</a></li>
+<li class="breadcrumb-item active">Indicator Achievements</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.filter-bar { background:#fff; border-radius:12px; border:1px solid #e2e8f0; padding:.75rem 1rem; margin-bottom:1rem; display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; }
+
+.summary-strip { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:.75rem; margin-bottom:1rem; }
+.summary-tile { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:.75rem .9rem; text-align:center; }
+.summary-tile .val { font-size:1.4rem; font-weight:700; color:#0f172a; line-height:1.05; }
+.summary-tile .lbl { font-size:0.68rem; text-transform:uppercase; letter-spacing:.03em; font-weight:600; color:#64748b; margin-top:.15rem; }
+
+.matrix-wrap { overflow-x:auto; background:#fff; border:1px solid #e2e8f0; border-radius:12px; }
+.matrix-table { font-size:0.82rem; margin:0; border-collapse:separate; border-spacing:0; min-width:900px; }
+.matrix-table thead th { font-size:0.7rem; text-transform:uppercase; letter-spacing:.03em; color:#64748b; font-weight:600; background:#f8fafc; border-bottom:2px solid #e2e8f0; padding:.55rem .5rem; white-space:nowrap; position:sticky; top:0; z-index:5; }
+.matrix-table tbody td { vertical-align:middle; padding:.65rem .5rem; border-bottom:1px solid #f1f5f9; }
+.matrix-table tbody tr:hover { background:#fafbfc; }
+
+.matrix-table .indicator-col { position:sticky; left:0; background:#fff; z-index:3; min-width:320px; max-width:420px; border-right:1px solid #e2e8f0; }
+.matrix-table thead .indicator-col { background:#f8fafc; z-index:6; }
+.matrix-table tbody tr:hover .indicator-col { background:#fafbfc; }
+
+.ind-code { font-size:0.68rem; padding:.15rem .5rem; border-radius:4px; background:rgba(0,119,200,0.12); color:var(--dodo-blue); font-weight:700; margin-right:.35rem; }
+.ind-code.impact { background:rgba(124,58,237,0.12); color:#7c3aed; }
+.ind-code.output { background:rgba(22,163,74,0.12); color:#16a34a; }
+.ind-desc { font-size:0.84rem; color:#0f172a; font-weight:500; line-height:1.35; }
+.ind-meta { font-size:0.7rem; color:#94a3b8; margin-top:.2rem; }
+
+.cell-value { font-weight:600; color:#0f172a; font-size:0.86rem; }
+.cell-empty { color:#cbd5e1; font-size:1rem; }
+.baseline-cell, .target-cell { font-size:0.78rem; color:#475569; white-space:nowrap; max-width:120px; overflow:hidden; text-overflow:ellipsis; }
+.target-cell { color:var(--dodo-blue); font-weight:600; }
+
+.year-label { text-align:center; background:#f0f7ff !important; font-size:0.7rem; font-weight:700; color:var(--dodo-blue); }
+.quarter-sub { text-align:center; font-weight:600; background:#fafbfc; }
+
+.no-results { padding:2.5rem 1rem; text-align:center; color:#64748b; }
+.no-results i { font-size:2rem; color:#cbd5e1; display:block; margin-bottom:.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-graph-up-arrow me-2" style="color:#7c3aed;"></i>Indicator Achievements Report</h1>
+    <p class="page-header-sub">CPD indicators tracked quarter-by-quarter against baseline and end target</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'monitoring:indicators' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-pencil-square me-1"></i>Enter Data
+    </a>
+    <a href="{% url 'reporting:export' 'indicators' %}?year={{ year }}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-download me-1"></i>Export CSV
+    </a>
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="summary-strip">
+  <div class="summary-tile">
+    <div class="val">{{ indicators|length }}</div>
+    <div class="lbl">Indicators</div>
+  </div>
+  <div class="summary-tile">
+    <div class="val" style="color:#7c3aed;">{{ summary.impact_count|default:0 }}</div>
+    <div class="lbl">Impact</div>
+  </div>
+  <div class="summary-tile">
+    <div class="val" style="color:var(--dodo-blue);">{{ summary.outcome_count|default:0 }}</div>
+    <div class="lbl">Outcome</div>
+  </div>
+  <div class="summary-tile">
+    <div class="val" style="color:#16a34a;">{{ summary.output_count|default:0 }}</div>
+    <div class="lbl">Output</div>
+  </div>
+  <div class="summary-tile">
+    <div class="val">{{ summary.with_data|default:0 }}</div>
+    <div class="lbl">With Data</div>
+  </div>
+  <div class="summary-tile">
+    <div class="val">{{ summary.coverage_pct|default:0 }}%</div>
+    <div class="lbl">Coverage</div>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<form method="get" class="filter-bar">
+  <label style="font-size:0.8rem;font-weight:600;color:#374151;margin:0;white-space:nowrap;">Year</label>
+  <select name="year" class="form-select form-select-sm" style="width:100px;" onchange="this.form.submit()">
+    {% for y in years %}
+      <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+    {% endfor %}
+  </select>
+
+  <input type="search" id="indSearch" class="form-control form-control-sm"
+         placeholder="Search indicator or outcome…" style="max-width:320px;">
+
+  <select id="tierFilter" class="form-select form-select-sm" style="width:160px;">
+    <option value="">All tiers</option>
+    <option value="impact">Impact</option>
+    <option value="outcome">Outcome</option>
+    <option value="output">Output</option>
+  </select>
+
+  <div class="ms-auto" style="font-size:0.78rem;color:#64748b;">
+    <i class="bi bi-list-ul me-1"></i><span id="rowCount">{{ indicators|length }}</span> indicator{{ indicators|length|pluralize }}
+  </div>
+</form>
+
+{% if indicators %}
+<div class="matrix-wrap">
+  <table class="matrix-table">
+    <thead>
+      <tr>
+        <th class="indicator-col" rowspan="2" style="padding-left:1rem;">Indicator</th>
+        <th rowspan="2">Baseline</th>
+        <th rowspan="2">End Target</th>
+        <th colspan="4" class="year-label">{{ year }} — Quarterly Achievements</th>
+        <th rowspan="2">Latest Status</th>
+      </tr>
+      <tr>
+        <th class="quarter-sub">Q1</th>
+        <th class="quarter-sub">Q2</th>
+        <th class="quarter-sub">Q3</th>
+        <th class="quarter-sub">Q4</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in indicators %}
+      <tr class="report-row"
+          data-search="{{ row.indicator.description|lower }} {{ row.indicator.code|lower }} {{ row.indicator.outcome.code|lower }} {{ row.indicator.outcome.title|lower }}"
+          data-tier="{{ row.indicator.outcome.tier }}">
+        <td class="indicator-col" style="padding-left:1rem;">
+          <div>
+            <span class="ind-code {{ row.indicator.outcome.tier }}">
+              {{ row.indicator.outcome.code }}{% if row.indicator.code %} · {{ row.indicator.code }}{% endif %}
+            </span>
+            <span class="badge bg-light text-dark" style="font-size:0.66rem;">{{ row.indicator.outcome.get_tier_display }}</span>
+          </div>
+          <div class="ind-desc mt-1">{{ row.indicator.description|truncatechars:110 }}</div>
+          <div class="ind-meta">
+            {% if row.indicator.frequency %}<i class="bi bi-arrow-repeat me-1"></i>{{ row.indicator.frequency }}{% endif %}
+          </div>
+        </td>
+        <td>
+          <span class="baseline-cell" title="{{ row.indicator.baseline }}">
+            {{ row.indicator.baseline|default:"—"|truncatechars:30 }}
+          </span>
+        </td>
+        <td>
+          <span class="target-cell" title="{{ row.indicator.end_target }}">
+            {{ row.indicator.end_target|default:"—"|truncatechars:30 }}
+          </span>
+        </td>
+        {% for a in row.cells %}
+          <td style="text-align:center;">
+            {% if a %}
+              <span class="cell-value" title="{% if a.notes %}{{ a.notes }}{% else %}Updated {{ a.updated_at|date:'d M Y' }}{% endif %}">
+                {{ a.achieved_value|truncatechars:20 }}
+              </span>
+            {% else %}
+              <span class="cell-empty">—</span>
+            {% endif %}
+          </td>
+        {% endfor %}
+        <td>
+          {% if row.latest %}
+            <span class="badge bg-light text-dark" style="font-size:0.68rem;">
+              {{ row.latest.year }} {{ row.latest.quarter }}
+            </span>
+            <div style="font-size:0.72rem;color:#64748b;margin-top:.15rem;">
+              <i class="bi bi-clock-history me-1"></i>{{ row.latest.updated_at|date:"d M Y" }}
+            </div>
+          {% else %}
+            <span style="color:#cbd5e1;font-size:0.78rem;">No data</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card">
+  <div class="no-results">
+    <i class="bi bi-graph-up-arrow"></i>
+    <div style="font-size:0.9rem;font-weight:600;color:#1e293b;">No indicators configured</div>
+    <p style="font-size:0.83rem;max-width:420px;margin:.5rem auto 1rem;">
+      CPD indicators are defined under the Country Programme Document framework.
+    </p>
+    <a href="{% url 'projects:cpd' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:7px;font-size:0.78rem;">
+      <i class="bi bi-diagram-3 me-1"></i>Open CPD Framework
+    </a>
+  </div>
+</div>
+{% endif %}
+
+<div id="noResults" class="card mt-3" style="display:none;">
+  <div class="no-results" style="padding:1.5rem;">
+    <i class="bi bi-search"></i>
+    <div style="font-size:0.85rem;">No indicators match your filters.</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const search = document.getElementById('indSearch');
+const tierFilter = document.getElementById('tierFilter');
+const rowCount = document.getElementById('rowCount');
+const noResults = document.getElementById('noResults');
+
+function applyFilter() {
+  if (!search) return;
+  const q = (search.value || '').trim().toLowerCase();
+  const t = tierFilter.value;
+  let visible = 0;
+  document.querySelectorAll('.report-row').forEach(el => {
+    const hay = el.dataset.search || '';
+    const matchesSearch = !q || hay.indexOf(q) !== -1;
+    const matchesTier = !t || el.dataset.tier === t;
+    const show = matchesSearch && matchesTier;
+    el.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  if (rowCount) rowCount.textContent = visible;
+  const hasAny = document.querySelectorAll('.report-row').length > 0;
+  if (noResults) noResults.style.display = (hasAny && visible === 0) ? '' : 'none';
+}
+
+search?.addEventListener('input', applyFilter);
+tierFilter?.addEventListener('change', applyFilter);
+</script>
+{% endblock %}

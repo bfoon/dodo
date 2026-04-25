@@ -1,0 +1,597 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Survey Dashboard — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'surveys:list' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Surveys</a></li>
+<li class="breadcrumb-item active">Dashboard</li>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<style>
+.toolbar { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:.65rem .85rem; margin-bottom:1rem; display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; }
+.toolbar .group { display:flex; gap:.3rem; align-items:center; flex-wrap:wrap; }
+.range-pill { padding:.32rem .75rem; border-radius:20px; border:1.5px solid #e2e8f0; background:#fff; font-size:0.78rem; color:#475569; text-decoration:none; font-weight:500; transition:all .12s; }
+.range-pill:hover { border-color:#cbd5e1; color:#0f172a; }
+.range-pill.active { background:var(--dodo-blue); color:#fff; border-color:var(--dodo-blue); }
+
+.customize-toggle { background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; border-radius:7px; font-size:0.78rem; padding:.3rem .65rem; display:inline-flex; align-items:center; gap:.35rem; cursor:pointer; }
+.customize-toggle:hover { background:#e2e8f0; color:#0f172a; }
+.customize-toggle.active { background:var(--dodo-blue); color:#fff; border-color:var(--dodo-blue); }
+
+.customize-panel {
+  background:#fff; border:1px solid #e2e8f0; border-radius:12px; margin-bottom:1rem;
+  padding:1rem 1.15rem; display:none;
+}
+.customize-panel.show { display:block; }
+.customize-panel h6 { font-size:0.78rem; text-transform:uppercase; letter-spacing:.04em; color:#64748b; font-weight:700; margin-bottom:.75rem; }
+.widget-toggles { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:.4rem; }
+.widget-toggle {
+  display:flex; align-items:center; gap:.55rem; padding:.4rem .65rem;
+  border:1px solid #e2e8f0; border-radius:8px; cursor:pointer; font-size:0.84rem; color:#0f172a;
+  transition:all .12s;
+}
+.widget-toggle:hover { border-color:var(--dodo-blue); }
+.widget-toggle input { margin:0; cursor:pointer; accent-color:var(--dodo-blue); }
+.widget-toggle .ico { color:#94a3b8; }
+.customize-panel .actions { display:flex; gap:.5rem; margin-top:.75rem; padding-top:.75rem; border-top:1px solid #f1f5f9; }
+.customize-panel .actions .btn { font-size:0.78rem; border-radius:7px; padding:.3rem .8rem; }
+
+/* KPI strip */
+.kpi-strip { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:.75rem; margin-bottom:1rem; }
+.kpi-tile { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:.85rem 1rem; }
+.kpi-tile .lbl { font-size:0.7rem; text-transform:uppercase; letter-spacing:.04em; font-weight:600; color:#64748b; }
+.kpi-tile .val { font-size:1.55rem; font-weight:700; color:#0f172a; line-height:1.1; margin-top:.2rem; }
+.kpi-tile .sub { font-size:0.72rem; color:#94a3b8; margin-top:.15rem; display:flex; align-items:center; gap:.25rem; }
+.kpi-tile .ico { width:36px; height:36px; border-radius:9px; display:inline-flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+
+/* Widget cards */
+.widget {
+  background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem 1.15rem;
+  margin-bottom:1rem; height:100%;
+}
+.widget .head {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:.75rem; padding-bottom:.6rem; border-bottom:1px solid #f1f5f9;
+}
+.widget .head h6 { margin:0; font-size:0.88rem; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:.5rem; }
+.widget .head .meta { font-size:0.72rem; color:#94a3b8; }
+.widget.hidden { display:none !important; }
+
+.chart-canvas { position:relative; height:280px; }
+.chart-canvas-tall { height:340px; }
+
+.dashboard-map { height:340px; border-radius:10px; border:1px solid #e2e8f0; background:#f8fafc; }
+
+.activity-list { list-style:none; padding:0; margin:0; }
+.activity-list li {
+  padding:.6rem 0; border-bottom:1px solid #f1f5f9;
+  display:flex; gap:.65rem; align-items:flex-start; font-size:0.85rem;
+}
+.activity-list li:last-child { border-bottom:none; }
+.activity-list .dot {
+  width:30px; height:30px; border-radius:50%; flex-shrink:0;
+  background:rgba(0,119,200,0.1); color:var(--dodo-blue);
+  display:flex; align-items:center; justify-content:center; font-size:0.78rem;
+}
+.activity-list .body { flex-grow:1; min-width:0; }
+.activity-list .title { font-weight:500; color:#0f172a; }
+.activity-list .meta { font-size:0.72rem; color:#94a3b8; margin-top:.15rem; }
+
+.empty-widget { text-align:center; padding:2rem 1rem; color:#94a3b8; font-size:0.85rem; }
+.empty-widget i { font-size:2rem; color:#cbd5e1; display:block; margin-bottom:.4rem; }
+
+@media (max-width:991px) { .chart-canvas { height:240px; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-pie-chart-fill me-2" style="color:var(--dodo-blue);"></i>Survey Dashboard</h1>
+    <p class="page-header-sub">Cross-survey analytics — responses, geography, and engagement</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'surveys:list' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-list-ul me-1"></i>All Surveys
+    </a>
+    <a href="{% url 'surveys:create' %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-plus-lg me-1"></i>New Survey
+    </a>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<form method="get" class="toolbar">
+  <div class="group">
+    <span style="font-size:0.78rem;font-weight:600;color:#374151;margin-right:.25rem;">Range:</span>
+    {% for d, label in days_options %}
+      <a href="?days={{ d }}{% if survey_filter_id %}&survey={{ survey_filter_id }}{% endif %}"
+         class="range-pill {% if days == d %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+
+  <div class="group" style="margin-left:auto;">
+    <label style="font-size:0.78rem;font-weight:600;color:#374151;margin:0;">Survey:</label>
+    <select name="survey" class="form-select form-select-sm" style="min-width:200px;font-size:0.82rem;border-radius:7px;" onchange="this.form.submit()">
+      <option value="">All surveys</option>
+      {% for s in survey_choices %}
+        <option value="{{ s.pk }}" {% if survey_filter_id == s.pk %}selected{% endif %}>{{ s.title|truncatechars:55 }}</option>
+      {% endfor %}
+    </select>
+    <input type="hidden" name="days" value="{{ days }}">
+    <button type="button" class="customize-toggle" id="customizeBtn">
+      <i class="bi bi-sliders"></i>Customize
+    </button>
+  </div>
+</form>
+
+<!-- Customize panel -->
+<div class="customize-panel" id="customizePanel">
+  <h6><i class="bi bi-grid-3x3-gap me-1"></i>Show / Hide Widgets</h6>
+  <div class="widget-toggles">
+    <label class="widget-toggle"><input type="checkbox" data-widget-toggle="kpis" checked>
+      <span class="ico"><i class="bi bi-speedometer2"></i></span>KPI summary
+    </label>
+    <label class="widget-toggle"><input type="checkbox" data-widget-toggle="timeline" checked>
+      <span class="ico"><i class="bi bi-graph-up"></i></span>Responses over time
+    </label>
+    <label class="widget-toggle"><input type="checkbox" data-widget-toggle="types" checked>
+      <span class="ico"><i class="bi bi-pie-chart"></i></span>Survey type distribution
+    </label>
+    <label class="widget-toggle"><input type="checkbox" data-widget-toggle="top" checked>
+      <span class="ico"><i class="bi bi-trophy"></i></span>Top surveys
+    </label>
+    <label class="widget-toggle"><input type="checkbox" data-widget-toggle="map" checked>
+      <span class="ico"><i class="bi bi-geo-alt"></i></span>Response locations
+    </label>
+    <label class="widget-toggle"><input type="checkbox" data-widget-toggle="qtypes" checked>
+      <span class="ico"><i class="bi bi-bar-chart"></i></span>Question types
+    </label>
+    <label class="widget-toggle"><input type="checkbox" data-widget-toggle="activity" checked>
+      <span class="ico"><i class="bi bi-clock-history"></i></span>Recent activity
+    </label>
+  </div>
+  <div class="actions">
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="showAllBtn">
+      <i class="bi bi-eye me-1"></i>Show all
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="resetBtn">
+      <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to defaults
+    </button>
+    <span style="margin-left:auto;font-size:0.74rem;color:#94a3b8;align-self:center;">
+      <i class="bi bi-info-circle me-1"></i>Saved to this browser
+    </span>
+  </div>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-strip" data-widget="kpis">
+  <div class="kpi-tile">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <div class="lbl">Surveys</div>
+        <div class="val">{{ kpis.total_surveys }}</div>
+        <div class="sub"><i class="bi bi-circle-fill" style="color:#16a34a;font-size:0.5rem;"></i> {{ kpis.active_surveys }} active</div>
+      </div>
+      <div class="ico" style="background:rgba(0,119,200,0.12);color:var(--dodo-blue);"><i class="bi bi-ui-checks-grid"></i></div>
+    </div>
+  </div>
+  <div class="kpi-tile">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <div class="lbl">Responses</div>
+        <div class="val">{{ kpis.total_responses }}</div>
+        <div class="sub">In selected range</div>
+      </div>
+      <div class="ico" style="background:rgba(22,163,74,0.12);color:#16a34a;"><i class="bi bi-people"></i></div>
+    </div>
+  </div>
+  <div class="kpi-tile">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <div class="lbl">Last 7 Days</div>
+        <div class="val">{{ kpis.responses_last_week }}</div>
+        <div class="sub">New responses</div>
+      </div>
+      <div class="ico" style="background:rgba(245,158,11,0.12);color:#f59e0b;"><i class="bi bi-lightning-charge"></i></div>
+    </div>
+  </div>
+  <div class="kpi-tile">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <div class="lbl">Unique Respondents</div>
+        <div class="val">{{ kpis.unique_respondents }}</div>
+        <div class="sub">By email / account</div>
+      </div>
+      <div class="ico" style="background:rgba(124,58,237,0.12);color:#7c3aed;"><i class="bi bi-person-vcard"></i></div>
+    </div>
+  </div>
+  <div class="kpi-tile">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <div class="lbl">Avg Completion</div>
+        <div class="val">{{ kpis.avg_completion }}%</div>
+        <div class="sub">Across responses</div>
+      </div>
+      <div class="ico" style="background:rgba(14,165,233,0.12);color:#0ea5e9;"><i class="bi bi-check2-circle"></i></div>
+    </div>
+  </div>
+  <div class="kpi-tile">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <div class="lbl">Geo Points</div>
+        <div class="val">{{ geo_points|length }}</div>
+        <div class="sub">Mapped locations</div>
+      </div>
+      <div class="ico" style="background:rgba(220,38,38,0.12);color:#dc2626;"><i class="bi bi-geo-alt-fill"></i></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Responses over time -->
+  <div class="col-lg-8" data-widget="timeline">
+    <div class="widget">
+      <div class="head">
+        <h6><i class="bi bi-graph-up" style="color:var(--dodo-blue);"></i>Responses Over Time</h6>
+        <span class="meta">{{ timeline_data.values|length }} buckets</span>
+      </div>
+      {% if timeline_data.values %}
+        <div class="chart-canvas"><canvas id="chartTimeline"></canvas></div>
+      {% else %}
+        <div class="empty-widget">
+          <i class="bi bi-graph-up"></i>
+          <div>No responses in this range yet.</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Survey type donut -->
+  <div class="col-lg-4" data-widget="types">
+    <div class="widget">
+      <div class="head">
+        <h6><i class="bi bi-pie-chart" style="color:#7c3aed;"></i>Survey Types</h6>
+      </div>
+      {% if type_data.values %}
+        <div class="chart-canvas"><canvas id="chartTypes"></canvas></div>
+      {% else %}
+        <div class="empty-widget">
+          <i class="bi bi-pie-chart"></i>
+          <div>No surveys yet.</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Top surveys -->
+  <div class="col-lg-6" data-widget="top">
+    <div class="widget">
+      <div class="head">
+        <h6><i class="bi bi-trophy" style="color:#f59e0b;"></i>Top Surveys by Responses</h6>
+      </div>
+      {% if top_surveys_data.values %}
+        <div class="chart-canvas chart-canvas-tall"><canvas id="chartTop"></canvas></div>
+      {% else %}
+        <div class="empty-widget">
+          <i class="bi bi-trophy"></i>
+          <div>No responses recorded yet.</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Question types -->
+  <div class="col-lg-6" data-widget="qtypes">
+    <div class="widget">
+      <div class="head">
+        <h6><i class="bi bi-bar-chart" style="color:#16a34a;"></i>Question Type Mix</h6>
+        <span class="meta">Across active questions</span>
+      </div>
+      {% if qtype_data.values %}
+        <div class="chart-canvas chart-canvas-tall"><canvas id="chartQtypes"></canvas></div>
+      {% else %}
+        <div class="empty-widget">
+          <i class="bi bi-bar-chart"></i>
+          <div>No questions configured.</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div class="col-lg-8" data-widget="map">
+    <div class="widget">
+      <div class="head">
+        <h6><i class="bi bi-geo-alt" style="color:#dc2626;"></i>Response Locations</h6>
+        <span class="meta">{{ geo_points|length }} mapped point{{ geo_points|length|pluralize }}</span>
+      </div>
+      {% if geo_points %}
+        <div id="dashboardMap" class="dashboard-map"></div>
+      {% else %}
+        <div class="empty-widget">
+          <i class="bi bi-geo-alt"></i>
+          <div>No geographic answers in this range.</div>
+          <div style="font-size:0.78rem;margin-top:.4rem;color:#cbd5e1;">
+            Add a "Geographic Location" question to a survey to start mapping responses.
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Recent activity -->
+  <div class="col-lg-4" data-widget="activity">
+    <div class="widget">
+      <div class="head">
+        <h6><i class="bi bi-clock-history" style="color:#0ea5e9;"></i>Recent Activity</h6>
+      </div>
+      {% if recent_responses %}
+        <ul class="activity-list">
+          {% for r in recent_responses %}
+          <li>
+            <div class="dot"><i class="bi bi-person-fill"></i></div>
+            <div class="body">
+              <div class="title">
+                {% if r.respondent_name %}{{ r.respondent_name|truncatechars:24 }}
+                {% elif r.respondent %}{{ r.respondent.get_full_name|default:r.respondent.email|truncatechars:24 }}
+                {% else %}Anonymous{% endif %}
+              </div>
+              <div class="meta">
+                <a href="{% url 'surveys:results' r.survey.pk %}" style="color:#64748b;text-decoration:none;">
+                  {{ r.survey.title|truncatechars:32 }}
+                </a>
+                · {{ r.completed_at|date:"d M, H:i" }}
+              </div>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty-widget">
+          <i class="bi bi-clock-history"></i>
+          <div>No recent activity.</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Pass server data to JS as JSON -->
+{{ timeline_data|json_script:"data-timeline" }}
+{{ type_data|json_script:"data-types" }}
+{{ top_surveys_data|json_script:"data-top" }}
+{{ qtype_data|json_script:"data-qtypes" }}
+{{ geo_points|json_script:"data-geo" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+// ---------- Customize: show/hide widgets, persisted in localStorage ----------
+const STORAGE_KEY = 'dodo:survey_dashboard:hidden';
+
+function getHidden() {
+  try { return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')); }
+  catch (_) { return new Set(); }
+}
+function saveHidden(set) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...set])); } catch (_) {}
+}
+function applyHidden() {
+  const hidden = getHidden();
+  document.querySelectorAll('[data-widget]').forEach(el => {
+    el.classList.toggle('hidden', hidden.has(el.dataset.widget));
+  });
+  document.querySelectorAll('[data-widget-toggle]').forEach(cb => {
+    cb.checked = !hidden.has(cb.dataset.widgetToggle);
+  });
+}
+
+document.getElementById('customizeBtn').addEventListener('click', function() {
+  const panel = document.getElementById('customizePanel');
+  panel.classList.toggle('show');
+  this.classList.toggle('active');
+});
+
+document.querySelectorAll('[data-widget-toggle]').forEach(cb => {
+  cb.addEventListener('change', () => {
+    const hidden = getHidden();
+    if (cb.checked) hidden.delete(cb.dataset.widgetToggle);
+    else hidden.add(cb.dataset.widgetToggle);
+    saveHidden(hidden);
+    applyHidden();
+  });
+});
+
+document.getElementById('showAllBtn').addEventListener('click', () => {
+  saveHidden(new Set());
+  applyHidden();
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  saveHidden(new Set());
+  applyHidden();
+});
+
+applyHidden();
+
+// ---------- Charts ----------
+function readJSON(id) {
+  const el = document.getElementById(id);
+  if (!el) return null;
+  try { return JSON.parse(el.textContent); }
+  catch (_) { return null; }
+}
+
+const PALETTE = [
+  '#0077c8', '#16a34a', '#f59e0b', '#7c3aed', '#0ea5e9',
+  '#dc2626', '#06b6d4', '#a855f7', '#84cc16', '#ec4899',
+  '#14b8a6', '#f97316'
+];
+
+// Chart.js global defaults
+if (window.Chart) {
+  Chart.defaults.font.family = 'system-ui, -apple-system, sans-serif';
+  Chart.defaults.font.size = 11;
+  Chart.defaults.color = '#64748b';
+  Chart.defaults.plugins.legend.labels.padding = 12;
+  Chart.defaults.plugins.legend.labels.boxWidth = 12;
+  Chart.defaults.plugins.legend.labels.usePointStyle = true;
+}
+
+// Timeline (line)
+(function() {
+  const data = readJSON('data-timeline');
+  const canvas = document.getElementById('chartTimeline');
+  if (!data || !canvas || !data.values?.length) return;
+  new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: data.labels,
+      datasets: [{
+        label: 'Responses',
+        data: data.values,
+        borderColor: '#0077c8',
+        backgroundColor: 'rgba(0,119,200,0.08)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        borderWidth: 2,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f1f5f9' } },
+        x: { grid: { display: false } },
+      },
+    },
+  });
+})();
+
+// Survey types (doughnut)
+(function() {
+  const data = readJSON('data-types');
+  const canvas = document.getElementById('chartTypes');
+  if (!data || !canvas || !data.values?.length) return;
+  new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels: data.labels,
+      datasets: [{
+        data: data.values,
+        backgroundColor: PALETTE,
+        borderWidth: 2,
+        borderColor: '#fff',
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '60%',
+      plugins: { legend: { position: 'bottom' } },
+    },
+  });
+})();
+
+// Top surveys (horizontal bar)
+(function() {
+  const data = readJSON('data-top');
+  const canvas = document.getElementById('chartTop');
+  if (!data || !canvas || !data.values?.length) return;
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: data.labels,
+      datasets: [{
+        label: 'Responses',
+        data: data.values,
+        backgroundColor: '#0077c8',
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f1f5f9' } },
+        y: { grid: { display: false } },
+      },
+      onClick: (evt, els) => {
+        if (els[0] && data.ids) {
+          const id = data.ids[els[0].index];
+          if (id) window.location.href = `/surveys/${id}/results/`;
+        }
+      },
+    },
+  });
+})();
+
+// Question types (horizontal bar)
+(function() {
+  const data = readJSON('data-qtypes');
+  const canvas = document.getElementById('chartQtypes');
+  if (!data || !canvas || !data.values?.length) return;
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: data.labels,
+      datasets: [{
+        label: 'Questions',
+        data: data.values,
+        backgroundColor: data.values.map((_, i) => PALETTE[i % PALETTE.length]),
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f1f5f9' } },
+        y: { grid: { display: false } },
+      },
+    },
+  });
+})();
+
+// ---------- Map ----------
+(function() {
+  const points = readJSON('data-geo') || [];
+  const mapEl = document.getElementById('dashboardMap');
+  if (!mapEl || !points.length || typeof L === 'undefined') return;
+
+  const map = L.map(mapEl);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 19,
+  }).addTo(map);
+
+  const markers = [];
+  points.forEach(p => {
+    const m = L.marker([p.lat, p.lng]);
+    const place = (p.place || '').replace(/[<>]/g, '');
+    const survey = (p.survey || '').replace(/[<>]/g, '');
+    m.bindPopup(`<strong>${survey}</strong><br>${place}<br><small>${p.date}</small>`);
+    m.addTo(map);
+    markers.push(m);
+  });
+
+  const group = L.featureGroup(markers);
+  map.fitBounds(group.getBounds().pad(0.15));
+
+  // If only one marker, force a sensible zoom
+  if (points.length === 1) map.setZoom(11);
+})();
+</script>
+{% endblock %}

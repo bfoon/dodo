@@ -1,0 +1,293 @@
+{% extends 'base.html' %}
+{% block title %}Progress Report — {{ year }} {{ quarter }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'reporting:home' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Reporting</a></li>
+<li class="breadcrumb-item active">Progress — {{ year }} {{ quarter }}</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.filter-bar { background:#fff; border-radius:12px; border:1px solid #e2e8f0; padding:.75rem 1rem; margin-bottom:1rem; display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; }
+.filter-bar label { font-size:0.8rem; font-weight:600; color:#374151; margin:0; white-space:nowrap; }
+.filter-bar select, .filter-bar input { font-size:0.82rem; border-radius:7px; }
+
+.summary-strip { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:.75rem; margin-bottom:1rem; }
+.summary-tile { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:.75rem .9rem; text-align:center; }
+.summary-tile .val { font-size:1.4rem; font-weight:700; color:#0f172a; line-height:1.05; }
+.summary-tile .lbl { font-size:0.68rem; text-transform:uppercase; letter-spacing:.03em; font-weight:600; color:#64748b; margin-top:.15rem; }
+.summary-tile .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:.25rem; vertical-align:middle; }
+
+.report-table { font-size:0.85rem; }
+.report-table thead th { font-size:0.7rem; text-transform:uppercase; letter-spacing:.03em; color:#64748b; font-weight:600; background:#f8fafc; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+.report-table tbody td { vertical-align:middle; }
+.report-table tbody tr:hover { background:#fafbfc; }
+.unit-chip { font-size:0.7rem; font-weight:600; padding:.15rem .5rem; border-radius:4px; color:#fff; white-space:nowrap; }
+
+.empty-cycle { background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:1.25rem 1.5rem; color:#854d0e; }
+.empty-cycle .title { font-weight:600; font-size:0.92rem; margin-bottom:.25rem; }
+.empty-cycle p { font-size:0.82rem; margin-bottom:.5rem; }
+
+.no-results { padding:2.5rem 1rem; text-align:center; color:#64748b; }
+.no-results i { font-size:2rem; color:#cbd5e1; display:block; margin-bottom:.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-bar-chart-line-fill me-2" style="color:var(--dodo-blue);"></i>Progress Report</h1>
+    <p class="page-header-sub">Reporting status for every project in {{ year }} {{ quarter }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'projects:tracker' %}?year={{ year }}&type=progress" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-table me-1"></i>Open Tracker
+    </a>
+    <a href="{% url 'reporting:export' 'progress' %}?year={{ year }}&quarter={{ quarter }}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-download me-1"></i>Export CSV
+    </a>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<form method="get" class="filter-bar">
+  <label>Year</label>
+  <select name="year" class="form-select form-select-sm" style="width:100px;" onchange="this.form.submit()">
+    {% for y in years %}
+      <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+    {% endfor %}
+  </select>
+
+  <label>Quarter</label>
+  <select name="quarter" class="form-select form-select-sm" style="width:100px;" onchange="this.form.submit()">
+    {% for q in quarters %}
+      <option value="{{ q }}" {% if q == quarter %}selected{% endif %}>{{ q }}</option>
+    {% endfor %}
+  </select>
+
+  <div class="ms-auto d-flex gap-2 align-items-center">
+    {% if cycle %}
+      <span style="font-size:0.76rem;color:#64748b;">
+        <i class="bi bi-calendar3 me-1"></i>Cycle:
+        <strong style="color:#0f172a;">{{ cycle.year }} {{ cycle.quarter }}</strong>
+        {% if cycle.submission_deadline %}
+          · Due <strong style="color:{% if cycle.submission_deadline < today %}#dc2626{% else %}#0f172a{% endif %};">
+            {{ cycle.submission_deadline|date:"d M Y" }}
+          </strong>
+        {% endif %}
+      </span>
+    {% endif %}
+  </div>
+</form>
+
+{% if not cycle %}
+<div class="empty-cycle">
+  <div class="title"><i class="bi bi-exclamation-triangle me-1"></i>No reporting cycle configured for {{ year }} {{ quarter }}</div>
+  <p>A progress reporting cycle for this period hasn't been set up. Add it in the admin or from the Reporting Cycles page.</p>
+  <a href="{% url 'projects:cycles' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:7px;font-size:0.78rem;">
+    <i class="bi bi-calendar3 me-1"></i>Open Cycles
+  </a>
+</div>
+{% else %}
+
+<!-- Status summary -->
+<div class="summary-strip">
+  <div class="summary-tile">
+    <div class="val">{{ projects|length }}</div>
+    <div class="lbl">Projects</div>
+  </div>
+  <div class="summary-tile">
+    <div class="val">
+      <span class="dot" style="background:#16a34a;"></span>{{ summary.submitted|default:0 }}
+    </div>
+    <div class="lbl">Submitted</div>
+  </div>
+  <div class="summary-tile">
+    <div class="val">
+      <span class="dot" style="background:#3b82f6;"></span>{{ summary.under_review|default:0 }}
+    </div>
+    <div class="lbl">Under Review</div>
+  </div>
+  <div class="summary-tile">
+    <div class="val">
+      <span class="dot" style="background:#f59e0b;"></span>{{ summary.pending|default:0 }}
+    </div>
+    <div class="lbl">Pending</div>
+  </div>
+  <div class="summary-tile">
+    <div class="val">
+      <span class="dot" style="background:#dc2626;"></span>{{ summary.overdue|default:0 }}
+    </div>
+    <div class="lbl">Overdue</div>
+  </div>
+  <div class="summary-tile">
+    <div class="val">
+      <span class="dot" style="background:#94a3b8;"></span>{{ summary.not_started|default:0 }}
+    </div>
+    <div class="lbl">Not Started</div>
+  </div>
+</div>
+
+<!-- Filter row -->
+<div class="filter-bar">
+  <input type="search" id="reportSearch" class="form-control form-control-sm"
+         placeholder="Search project title, PIMS ID, or donor…"
+         style="max-width:320px;">
+
+  <select id="statusFilter" class="form-select form-select-sm" style="width:180px;">
+    <option value="">All statuses</option>
+    <option value="submitted">Submitted</option>
+    <option value="under_review">Under Review</option>
+    <option value="pending">Pending</option>
+    <option value="overdue">Overdue</option>
+    <option value="not_started">Not Started</option>
+    <option value="not_applicable">Not Applicable</option>
+    <option value="closed">Closed</option>
+  </select>
+
+  <select id="unitFilter" class="form-select form-select-sm" style="width:200px;">
+    <option value="">All units</option>
+    {% for u in units %}
+      <option value="{{ u.pk }}">{{ u.name }}</option>
+    {% endfor %}
+  </select>
+
+  <div class="ms-auto" style="font-size:0.78rem;color:#64748b;">
+    <i class="bi bi-list-ul me-1"></i><span id="rowCount">{{ rows|length }}</span> row{{ rows|length|pluralize }}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover report-table mb-0">
+        <thead>
+          <tr>
+            <th style="padding-left:1rem;">Project</th>
+            <th>Unit</th>
+            <th>Project Status</th>
+            <th>Report Status</th>
+            <th>Last Updated</th>
+            <th>Notes</th>
+            <th style="width:1%;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr class="report-row"
+              data-search="{{ row.project.title|lower }} {{ row.project.pims_id|lower }} {{ row.project.donor|lower }}"
+              data-status="{{ row.status_code }}"
+              data-unit="{{ row.project.programme_unit_id|default:'' }}">
+            <td style="padding-left:1rem;">
+              {% if row.project.pims_id %}
+                <div style="font-size:0.7rem;color:#94a3b8;">{{ row.project.pims_id }}</div>
+              {% endif %}
+              <a href="{% url 'projects:detail' row.project.pk %}" style="color:#0f172a;text-decoration:none;font-weight:500;">
+                {{ row.project.display_title }}
+              </a>
+              {% if row.project.donor %}
+                <div style="font-size:0.72rem;color:#64748b;margin-top:.15rem;">
+                  <i class="bi bi-briefcase me-1" style="color:#94a3b8;"></i>{{ row.project.donor|truncatechars:35 }}
+                </div>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.project.programme_unit %}
+                <span class="unit-chip" style="background:{{ row.project.programme_unit.color }};">
+                  {{ row.project.programme_unit.name|truncatechars:20 }}
+                </span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge badge-{{ row.project.status }}">{{ row.project.get_status_display }}</span>
+            </td>
+            <td>
+              {% if row.status %}
+                <span class="badge badge-{{ row.status.status }}">{{ row.status.get_status_display }}</span>
+              {% else %}
+                <span class="badge badge-not_started">Not Started</span>
+              {% endif %}
+            </td>
+            <td style="font-size:0.78rem;color:#64748b;white-space:nowrap;">
+              {% if row.status and row.status.updated_at %}
+                {{ row.status.updated_at|date:"d M Y" }}
+                {% if row.status.updated_by %}
+                  <div style="font-size:0.7rem;color:#94a3b8;">by {{ row.status.updated_by.get_full_name|default:row.status.updated_by.email }}</div>
+                {% endif %}
+              {% else %}
+                <span style="color:#cbd5e1;">—</span>
+              {% endif %}
+            </td>
+            <td style="font-size:0.78rem;color:#475569;max-width:240px;">
+              {% if row.status and row.status.notes %}
+                <span title="{{ row.status.notes }}">{{ row.status.notes|truncatechars:60 }}</span>
+              {% else %}
+                <span style="color:#cbd5e1;">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'projects:detail' row.project.pk %}" class="btn btn-sm btn-outline-secondary" style="border-radius:6px;padding:.15rem .4rem;">
+                <i class="bi bi-arrow-right"></i>
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="no-results">
+              <i class="bi bi-inbox"></i>
+              <div>No projects found for this country office.</div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="noResults" class="card mt-3" style="display:none;">
+  <div class="no-results" style="padding:1.5rem;">
+    <i class="bi bi-search"></i>
+    <div style="font-size:0.85rem;">No rows match your filters.</div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const search = document.getElementById('reportSearch');
+const statusFilter = document.getElementById('statusFilter');
+const unitFilter = document.getElementById('unitFilter');
+const rowCount = document.getElementById('rowCount');
+const noResults = document.getElementById('noResults');
+
+function applyFilter() {
+  if (!search) return;
+  const q = (search.value || '').trim().toLowerCase();
+  const s = statusFilter.value;
+  const u = unitFilter.value;
+  let visible = 0;
+  document.querySelectorAll('.report-row').forEach(el => {
+    const hay = el.dataset.search || '';
+    const matchesSearch = !q || hay.indexOf(q) !== -1;
+    const matchesStatus = !s || el.dataset.status === s;
+    const matchesUnit = !u || el.dataset.unit === u;
+    const show = matchesSearch && matchesStatus && matchesUnit;
+    el.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  if (rowCount) rowCount.textContent = visible;
+  const hasAny = document.querySelectorAll('.report-row').length > 0;
+  if (noResults) noResults.style.display = (hasAny && visible === 0) ? '' : 'none';
+}
+
+search?.addEventListener('input', applyFilter);
+statusFilter?.addEventListener('change', applyFilter);
+unitFilter?.addEventListener('change', applyFilter);
+</script>
+{% endblock %}
