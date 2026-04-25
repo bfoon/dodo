@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+{% block title %}My Profile — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item active">Profile</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.profile-card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:1.25rem; }
+.section-title { font-size:0.82rem; font-weight:700; color:#0f172a; margin-bottom:.75rem; display:flex; align-items:center; gap:.5rem; }
+.section-title i { color:var(--dodo-blue); }
+.avatar { width:80px; height:80px; border-radius:50%; background:#f0f7ff; color:var(--dodo-blue); display:flex; align-items:center; justify-content:center; font-size:2rem; font-weight:700; overflow:hidden; flex-shrink:0; }
+.avatar img { width:100%; height:100%; object-fit:cover; }
+
+.access-row { display:flex; align-items:center; gap:.6rem; padding:.6rem .75rem; border:1px solid #e2e8f0; border-radius:10px; background:#fafbfc; margin-bottom:.4rem; font-size:0.84rem; }
+.co-pill { font-size:0.7rem; font-weight:600; padding:.2rem .55rem; border-radius:6px; background:rgba(0,119,200,0.12); color:var(--dodo-blue); }
+.role-pill { font-size:0.72rem; color:#64748b; }
+.access-active { color:#16a34a; font-size:0.72rem; font-weight:600; margin-left:auto; }
+
+.label { font-size:0.78rem; font-weight:600; color:#374151; margin-bottom:.25rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-person-circle me-2" style="color:var(--dodo-blue);"></i>My Profile</h1>
+    <p class="page-header-sub">Manage your personal info, password, and active offices</p>
+  </div>
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert" style="font-size:0.85rem;">
+      {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<div class="row g-3">
+  <!-- Profile -->
+  <div class="col-lg-7">
+    <div class="profile-card mb-3">
+      <div class="section-title"><i class="bi bi-person-fill"></i>Personal information</div>
+      <div class="d-flex gap-3 align-items-start mb-3">
+        <div class="avatar">
+          {% if user.profile_photo %}
+            <img src="{{ user.profile_photo.url }}" alt="">
+          {% else %}
+            {{ user.first_name|slice:":1" }}{{ user.last_name|slice:":1" }}
+          {% endif %}
+        </div>
+        <div style="flex-grow:1;">
+          <div style="font-size:1rem;font-weight:700;color:#0f172a;">{{ user.get_full_name|default:user.email }}</div>
+          <div style="font-size:0.83rem;color:#64748b;">{{ user.email }}</div>
+          {% if user.position %}<div style="font-size:0.78rem;color:#94a3b8;margin-top:.15rem;">{{ user.position }}</div>{% endif %}
+          {% if user.is_global_admin %}
+            <span class="badge mt-1" style="background:#fef3c7;color:#854d0e;font-size:0.7rem;">
+              <i class="bi bi-shield-check me-1"></i>Global admin
+            </span>
+          {% endif %}
+        </div>
+      </div>
+
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_profile">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="label">First name</div>
+            {{ profile_form.first_name }}
+            {% if profile_form.first_name.errors %}<div class="text-danger small mt-1">{{ profile_form.first_name.errors.0 }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <div class="label">Last name</div>
+            {{ profile_form.last_name }}
+            {% if profile_form.last_name.errors %}<div class="text-danger small mt-1">{{ profile_form.last_name.errors.0 }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <div class="label">Phone</div>
+            {{ profile_form.phone }}
+          </div>
+          <div class="col-md-6">
+            <div class="label">Position</div>
+            {{ profile_form.position }}
+          </div>
+          <div class="col-12">
+            <div class="label">Profile photo</div>
+            {{ profile_form.profile_photo }}
+          </div>
+        </div>
+        <div class="mt-3">
+          <button type="submit" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:7px;">
+            <i class="bi bi-check2 me-1"></i>Save profile
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Password -->
+    <div class="profile-card">
+      <div class="section-title"><i class="bi bi-key-fill"></i>Change password</div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="change_password">
+        <div class="row g-3">
+          <div class="col-md-12">
+            <div class="label">Current password</div>
+            {{ password_form.current_password }}
+            {% if password_form.current_password.errors %}<div class="text-danger small mt-1">{{ password_form.current_password.errors.0 }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <div class="label">New password</div>
+            {{ password_form.new_password }}
+            {% if password_form.new_password.errors %}<div class="text-danger small mt-1">{{ password_form.new_password.errors.0 }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <div class="label">Confirm new password</div>
+            {{ password_form.confirm_password }}
+            {% if password_form.confirm_password.errors %}<div class="text-danger small mt-1">{{ password_form.confirm_password.errors.0 }}</div>{% endif %}
+          </div>
+        </div>
+        <div class="mt-3">
+          <button type="submit" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:7px;">
+            <i class="bi bi-shield-lock me-1"></i>Change password
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Access -->
+  <div class="col-lg-5">
+    <div class="profile-card">
+      <div class="section-title"><i class="bi bi-globe2"></i>Country office access</div>
+      {% if user.primary_country_office %}
+      <div style="font-size:0.8rem;color:#64748b;margin-bottom:.5rem;">
+        Primary office: <strong style="color:#0f172a;">{{ user.primary_country_office.name }}</strong>
+      </div>
+      {% endif %}
+
+      {% if accesses %}
+        {% for a in accesses %}
+        <div class="access-row">
+          <span class="co-pill">{{ a.country_office.code }}</span>
+          <div>
+            <div style="font-size:0.84rem;font-weight:500;color:#0f172a;">{{ a.country_office.name }}</div>
+            <div class="role-pill"><i class="bi bi-shield me-1"></i>{{ a.role.name }}</div>
+          </div>
+          <span class="access-active"><i class="bi bi-check-circle-fill me-1"></i>Active</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="font-size:0.82rem;color:#64748b;padding:.75rem;border:1px dashed #e2e8f0;border-radius:8px;text-align:center;">
+          <i class="bi bi-info-circle me-1"></i>You don't have access to any country office yet.
+        </div>
+      {% endif %}
+
+      <div style="font-size:0.74rem;color:#94a3b8;margin-top:.75rem;">
+        <i class="bi bi-info-circle me-1"></i>
+        Access is granted by your administrator. To request additional access, contact your M&E focal point.
+      </div>
+    </div>
+
+    <div class="profile-card mt-3">
+      <div class="section-title"><i class="bi bi-info-circle-fill"></i>Account details</div>
+      <div style="font-size:0.82rem;color:#475569;line-height:1.8;">
+        <div><span style="color:#94a3b8;">Member since</span> &nbsp;<strong>{{ user.created_at|date:"d M Y" }}</strong></div>
+        <div><span style="color:#94a3b8;">Last login</span> &nbsp;<strong>{{ user.last_login|date:"d M Y, H:i"|default:"—" }}</strong></div>
+        <div><span style="color:#94a3b8;">Last modified</span> &nbsp;<strong>{{ user.last_modified|date:"d M Y" }}</strong></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

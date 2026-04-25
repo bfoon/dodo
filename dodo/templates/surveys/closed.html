@@ -1,0 +1,97 @@
+{% extends 'surveys/public_base.html' %}
+{% block title %}Survey Closed — {{ survey.title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.closed-card {
+  background:#fff; border:1px solid var(--border); border-radius:14px;
+  padding:2.5rem 2rem; text-align:center; max-width:560px; margin:1rem auto 0;
+}
+.closed-card.expired { border-top:4px solid #dc2626; }
+.closed-card.not_started { border-top:4px solid #f59e0b; }
+.closed-card.inactive { border-top:4px solid #64748b; }
+.closed-card .icon-wrap {
+  width:72px; height:72px; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:2.5rem; margin-bottom:1rem;
+}
+.closed-card.expired .icon-wrap { background:rgba(220,38,38,.1); color:#dc2626; }
+.closed-card.not_started .icon-wrap { background:rgba(245,158,11,.1); color:#f59e0b; }
+.closed-card.inactive .icon-wrap { background:rgba(100,116,139,.12); color:#64748b; }
+
+.closed-card h1 { font-weight:700; color:var(--text); font-size:1.6rem; margin-bottom:.5rem; }
+.closed-card .reason { font-size:.95rem; color:#475569; line-height:1.55; margin-bottom:1.25rem; }
+
+.detail-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:.75rem;
+  background:#f8fafc; border:1px solid var(--border); border-radius:10px;
+  padding:1rem; margin-bottom:1.25rem; text-align:left;
+}
+.detail-grid .lbl {
+  font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;
+  font-weight:700; color:#94a3b8;
+}
+.detail-grid .val {
+  font-size:.86rem; color:var(--text); margin-top:.15rem; font-weight:500;
+}
+@media (max-width:480px) { .detail-grid { grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="closed-card {{ reason_code }}">
+  <div class="icon-wrap">
+    {% if reason_code == 'expired' %}
+      <i class="bi bi-calendar-x"></i>
+    {% elif reason_code == 'not_started' %}
+      <i class="bi bi-clock-history"></i>
+    {% else %}
+      <i class="bi bi-lock-fill"></i>
+    {% endif %}
+  </div>
+
+  <h1>
+    {% if reason_code == 'expired' %}This survey has closed
+    {% elif reason_code == 'not_started' %}This survey hasn't opened yet
+    {% else %}This survey is not accepting responses{% endif %}
+  </h1>
+
+  <div class="reason">
+    {% if reason_code == 'expired' %}
+      The deadline for submissions has passed. Thank you for your interest — please contact the survey owner if you believe this is an error.
+    {% elif reason_code == 'not_started' %}
+      This survey will open later. Check back after the start date.
+    {% else %}
+      The survey owner has paused or closed this form. It may reopen at a later time.
+    {% endif %}
+  </div>
+
+  <div class="detail-grid">
+    <div>
+      <div class="lbl">Survey</div>
+      <div class="val">{{ survey.title|truncatechars:60 }}</div>
+    </div>
+    <div>
+      <div class="lbl">Status</div>
+      <div class="val">{{ survey.get_status_display }}</div>
+    </div>
+    {% if survey.start_date %}
+    <div>
+      <div class="lbl">Opened</div>
+      <div class="val">{{ survey.start_date|date:"d M Y" }}</div>
+    </div>
+    {% endif %}
+    {% if survey.end_date %}
+    <div>
+      <div class="lbl">Closed</div>
+      <div class="val">{{ survey.end_date|date:"d M Y" }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div style="font-size:.78rem;color:#94a3b8;">
+    <i class="bi bi-info-circle me-1"></i>
+    If you reached this page in error, please contact the team that shared the survey link with you.
+  </div>
+</div>
+{% endblock %}

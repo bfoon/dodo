@@ -1,0 +1,281 @@
+{% extends 'base.html' %}
+{% block title %}{{ role.name }} — Permissions{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'accounts:role_list' %}" style="color:var(--dodo-blue);text-decoration:none;">Roles</a></li>
+<li class="breadcrumb-item active">{{ role.name }}</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.role-banner { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:1rem 1.25rem; margin-bottom:1rem; display:flex; align-items:center; gap:1rem; }
+.role-banner .swatch { width:48px; height:48px; border-radius:12px; background:rgba(0,119,200,0.12); color:var(--dodo-blue); display:inline-flex; align-items:center; justify-content:center; font-size:1.3rem; flex-shrink:0; }
+.role-banner h1 { font-size:1.15rem; font-weight:700; color:#0f172a; margin:0; }
+.role-banner .sub { font-size:0.82rem; color:#64748b; margin-top:.15rem; }
+
+.perm-matrix { border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; background:#fff; }
+.perm-matrix table { font-size:0.85rem; margin:0; }
+.perm-matrix thead th { font-size:0.7rem; text-transform:uppercase; letter-spacing:.03em; color:#64748b; font-weight:600; background:#f8fafc; padding:.65rem .6rem; text-align:center; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+.perm-matrix thead th:first-child { text-align:left; padding-left:1rem; }
+.perm-matrix tbody td { padding:.6rem .75rem; border-bottom:1px solid #f1f5f9; text-align:center; vertical-align:middle; }
+.perm-matrix tbody td:first-child { text-align:left; font-weight:500; color:#0f172a; padding-left:1rem; }
+.perm-matrix tbody tr:last-child td { border-bottom:none; }
+.perm-matrix tbody tr:hover { background:#fafbfc; }
+.perm-matrix tbody tr.changed { background:#fffbeb !important; }
+.module-icon { color:var(--dodo-blue); margin-right:.5rem; }
+.row-count { font-size:0.7rem; color:#94a3b8; margin-left:.4rem; }
+
+.matrix-actions { display:flex; gap:.5rem; padding:.6rem 1rem; background:#fafbfc; border-top:1px solid #e2e8f0; font-size:0.78rem; align-items:center; }
+.matrix-actions a { color:var(--dodo-blue); text-decoration:none; cursor:pointer; }
+.matrix-actions a:hover { text-decoration:underline; }
+
+.summary-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem 1.25rem; }
+.summary-stat { display:flex; justify-content:space-between; align-items:center; padding:.4rem 0; border-bottom:1px dashed #e2e8f0; font-size:0.85rem; }
+.summary-stat:last-child { border-bottom:none; }
+.summary-stat .num { font-weight:700; color:#0f172a; }
+
+.save-bar { position:sticky; bottom:0; background:#fff; border-top:1px solid #e2e8f0; margin-top:1rem; padding:.75rem 1rem; border-radius:0 0 12px 12px; display:flex; gap:.5rem; align-items:center; }
+.save-bar .changes-count { font-size:0.82rem; color:#64748b; }
+.save-bar .changes-count strong { color:var(--dodo-blue); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="role-banner">
+  <div class="swatch"><i class="bi bi-shield-fill"></i></div>
+  <div style="flex-grow:1;">
+    <h1>{{ role.name }}
+      {% if not role.is_active %}<span class="badge ms-1" style="background:#f1f5f9;color:#64748b;font-size:0.66rem;">Inactive</span>{% endif %}
+    </h1>
+    <div class="sub">
+      <i class="bi bi-globe2 me-1"></i>{{ role.country_office.name }}
+      <span class="ms-2" style="color:#cbd5e1;">·</span>
+      <span class="ms-2"><i class="bi bi-tag me-1"></i>{{ role.code }}</span>
+      <span class="ms-2" style="color:#cbd5e1;">·</span>
+      <span class="ms-2"><i class="bi bi-people me-1"></i>{{ user_count }} active user{{ user_count|pluralize }}</span>
+    </div>
+    {% if role.description %}
+    <div style="font-size:0.84rem;color:#475569;margin-top:.3rem;line-height:1.5;">{{ role.description }}</div>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'accounts:role_list' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+  </div>
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert" style="font-size:0.85rem;">
+      {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<form method="post" id="permsForm">
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-lg-9">
+      <div class="perm-matrix">
+        <div class="table-responsive">
+          <table class="table mb-0" id="permsTable">
+            <thead>
+              <tr>
+                <th>Module</th>
+                {% for action_code, action_label in actions %}
+                  <th>{{ action_label }}</th>
+                {% endfor %}
+                <th style="width:1%;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for module_code, module_label in modules %}
+              <tr data-module="{{ module_code }}">
+                <td>
+                  <i class="bi bi-grid-fill module-icon"></i>{{ module_label }}
+                  <span class="row-count" data-row-count></span>
+                </td>
+                {% for action_code, action_label in actions %}
+                  <td>
+                    <input type="checkbox"
+                           name="perm__{{ module_code }}__{{ action_code }}"
+                           class="form-check-input perm-check"
+                           data-module="{{ module_code }}"
+                           data-action="{{ action_code }}"
+                           {% with pair=module_code|add:":"|add:action_code %}
+                             {% for m, a in existing %}
+                               {% if m == module_code and a == action_code %}checked{% endif %}
+                             {% endfor %}
+                           {% endwith %}>
+                  </td>
+                {% endfor %}
+                <td>
+                  <a onclick="rowSetAll('{{ module_code }}', true)" class="text-muted" title="Select all in row" style="cursor:pointer;font-size:0.78rem;">
+                    <i class="bi bi-check-all"></i>
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="matrix-actions">
+          <a onclick="setAll(true)"><i class="bi bi-check-all me-1"></i>Select all</a>
+          <span style="color:#cbd5e1;">·</span>
+          <a onclick="setAll(false)"><i class="bi bi-x-lg me-1"></i>Clear all</a>
+          <span style="color:#cbd5e1;">·</span>
+          <a onclick="setAction('view', true)"><i class="bi bi-eye me-1"></i>All view</a>
+          <a onclick="setAction('edit', true)"><i class="bi bi-pencil me-1"></i>All edit</a>
+          <a onclick="setAction('export', true)"><i class="bi bi-download me-1"></i>All export</a>
+          <span style="color:#cbd5e1;">·</span>
+          <a onclick="resetForm()" style="color:#dc2626;"><i class="bi bi-arrow-counterclockwise me-1"></i>Discard changes</a>
+        </div>
+      </div>
+
+      <div class="save-bar">
+        <span class="changes-count">
+          <i class="bi bi-info-circle me-1"></i>
+          <strong id="changeCount">0</strong> change<span id="changePlural">s</span> pending
+        </span>
+        <div class="ms-auto d-flex gap-2">
+          <a href="{% url 'accounts:role_list' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:7px;font-size:0.82rem;">Cancel</a>
+          <button type="submit" id="saveBtn" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:7px;font-size:0.82rem;" disabled>
+            <i class="bi bi-check2 me-1"></i>Save permissions
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="col-lg-3">
+      <div class="summary-card">
+        <div style="font-size:0.82rem;font-weight:700;color:#0f172a;margin-bottom:.5rem;">
+          <i class="bi bi-bar-chart-fill me-1" style="color:var(--dodo-blue);"></i>Summary
+        </div>
+        <div class="summary-stat">
+          <span style="color:#64748b;">Total modules</span>
+          <span class="num">{{ modules|length }}</span>
+        </div>
+        <div class="summary-stat">
+          <span style="color:#64748b;">Possible permissions</span>
+          <span class="num" id="totalPossible">0</span>
+        </div>
+        <div class="summary-stat">
+          <span style="color:#64748b;">Currently granted</span>
+          <span class="num" id="grantedCount">{{ existing|length }}</span>
+        </div>
+        <div class="summary-stat">
+          <span style="color:#64748b;">Coverage</span>
+          <span class="num" id="coveragePct">—</span>
+        </div>
+      </div>
+
+      <div class="summary-card mt-3">
+        <div style="font-size:0.82rem;font-weight:700;color:#0f172a;margin-bottom:.5rem;">
+          <i class="bi bi-info-circle-fill me-1" style="color:var(--dodo-blue);"></i>How this works
+        </div>
+        <div style="font-size:0.78rem;color:#475569;line-height:1.6;">
+          Each cell maps to one <strong>module × action</strong> permission. Users who hold this role inherit all checked permissions within {{ role.country_office.name }}.
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const form = document.getElementById('permsForm');
+const saveBtn = document.getElementById('saveBtn');
+const changeCount = document.getElementById('changeCount');
+const changePlural = document.getElementById('changePlural');
+const grantedCount = document.getElementById('grantedCount');
+const coveragePct = document.getElementById('coveragePct');
+const totalPossible = document.getElementById('totalPossible');
+
+// Capture initial state per checkbox
+const checkboxes = Array.from(document.querySelectorAll('.perm-check'));
+const initialState = new Map();
+checkboxes.forEach(cb => initialState.set(cb.name, cb.checked));
+
+function updateRowCounts() {
+  document.querySelectorAll('tr[data-module]').forEach(tr => {
+    const checked = tr.querySelectorAll('.perm-check:checked').length;
+    const total = tr.querySelectorAll('.perm-check').length;
+    const counter = tr.querySelector('[data-row-count]');
+    counter.textContent = checked ? `${checked}/${total}` : '';
+  });
+}
+
+function updateSummary() {
+  const granted = checkboxes.filter(cb => cb.checked).length;
+  const total = checkboxes.length;
+  totalPossible.textContent = total;
+  grantedCount.textContent = granted;
+  coveragePct.textContent = total ? `${Math.round((granted / total) * 100)}%` : '—';
+}
+
+function updateChangeTracking() {
+  let added = 0, removed = 0;
+  let changedRows = new Set();
+  checkboxes.forEach(cb => {
+    const initial = initialState.get(cb.name);
+    if (cb.checked !== initial) {
+      cb.checked ? added++ : removed++;
+      changedRows.add(cb.dataset.module);
+    }
+  });
+  // Highlight rows with pending changes
+  document.querySelectorAll('tr[data-module]').forEach(tr => {
+    tr.classList.toggle('changed', changedRows.has(tr.dataset.module));
+  });
+
+  const total = added + removed;
+  changeCount.textContent = total;
+  changePlural.style.display = total === 1 ? 'none' : '';
+  saveBtn.disabled = total === 0;
+}
+
+function refresh() {
+  updateRowCounts();
+  updateSummary();
+  updateChangeTracking();
+}
+
+checkboxes.forEach(cb => cb.addEventListener('change', refresh));
+refresh();
+
+// Bulk actions
+function setAll(checked) {
+  checkboxes.forEach(cb => cb.checked = checked);
+  refresh();
+}
+function setAction(action, checked) {
+  document.querySelectorAll(`.perm-check[data-action="${action}"]`).forEach(cb => cb.checked = checked);
+  refresh();
+}
+function rowSetAll(module, checked) {
+  document.querySelectorAll(`.perm-check[data-module="${module}"]`).forEach(cb => cb.checked = checked);
+  refresh();
+}
+function resetForm() {
+  if (!confirm('Discard all unsaved changes?')) return;
+  checkboxes.forEach(cb => cb.checked = initialState.get(cb.name));
+  refresh();
+}
+
+// Warn on navigating away with unsaved changes
+window.addEventListener('beforeunload', (e) => {
+  if (!saveBtn.disabled) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+form.addEventListener('submit', () => {
+  // Allow submit by removing the warning
+  saveBtn.disabled = true;
+});
+</script>
+{% endblock %}

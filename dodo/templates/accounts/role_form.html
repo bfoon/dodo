@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block title %}Add Role — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'accounts:role_list' %}" style="color:var(--dodo-blue);text-decoration:none;">Roles</a></li>
+<li class="breadcrumb-item active">{% if mode == 'edit' %}Edit{% else %}Add{% endif %}</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:1.25rem 1.5rem; }
+.section-title { font-size:0.82rem; font-weight:700; color:#0f172a; margin-bottom:.75rem; display:flex; align-items:center; gap:.5rem; }
+.section-title i { color:var(--dodo-blue); }
+.label { font-size:0.78rem; font-weight:600; color:#374151; margin-bottom:.25rem; }
+.error-text { font-size:0.74rem; color:#dc2626; margin-top:.25rem; }
+hr.section-rule { border-color:#e2e8f0; margin:1.25rem 0; }
+
+.perm-matrix { border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; background:#fff; }
+.perm-matrix table { font-size:0.84rem; margin:0; }
+.perm-matrix thead th { font-size:0.7rem; text-transform:uppercase; letter-spacing:.03em; color:#64748b; font-weight:600; background:#f8fafc; padding:.6rem; text-align:center; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+.perm-matrix thead th:first-child { text-align:left; }
+.perm-matrix tbody td { padding:.55rem .75rem; border-bottom:1px solid #f1f5f9; text-align:center; vertical-align:middle; }
+.perm-matrix tbody td:first-child { text-align:left; font-weight:500; color:#0f172a; }
+.perm-matrix tbody tr:last-child td { border-bottom:none; }
+.perm-matrix tbody tr:hover { background:#fafbfc; }
+.module-icon { color:var(--dodo-blue); margin-right:.4rem; }
+
+.matrix-actions { display:flex; gap:.5rem; padding:.6rem .75rem; background:#fafbfc; border-top:1px solid #e2e8f0; font-size:0.78rem; align-items:center; }
+.matrix-actions a { color:var(--dodo-blue); text-decoration:none; cursor:pointer; }
+.matrix-actions a:hover { text-decoration:underline; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-shield-plus me-2" style="color:var(--dodo-blue);"></i>Add Role</h1>
+    <p class="page-header-sub">Define a role and pick the modules and actions it should grant</p>
+  </div>
+  <div>
+    <a href="{% url 'accounts:role_list' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-arrow-left me-1"></i>Back to roles
+    </a>
+  </div>
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert" style="font-size:0.85rem;">
+      {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<form method="post" class="form-card">
+  {% csrf_token %}
+
+  <div class="section-title"><i class="bi bi-shield-fill"></i>Role details</div>
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="label">Role name *</div>
+      {{ form.name }}
+      {% if form.name.errors %}<div class="error-text">{{ form.name.errors.0 }}</div>{% endif %}
+    </div>
+    <div class="col-md-6">
+      <div class="label">Country office *</div>
+      {{ form.country_office }}
+      {% if form.country_office.errors %}<div class="error-text">{{ form.country_office.errors.0 }}</div>{% endif %}
+    </div>
+    <div class="col-12">
+      <div class="label">Description</div>
+      {{ form.description }}
+    </div>
+    <div class="col-12">
+      <div class="form-check">
+        {{ form.is_active }}
+        <label class="form-check-label" style="font-size:0.86rem;">Active</label>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-rule">
+
+  <div class="section-title">
+    <i class="bi bi-grid-3x3-gap-fill"></i>Permissions matrix
+    <span style="font-size:0.74rem;color:#94a3b8;font-weight:500;margin-left:.5rem;">
+      Tick the actions this role should be allowed to perform on each module.
+    </span>
+  </div>
+
+  <div class="perm-matrix">
+    <div class="table-responsive">
+      <table class="table mb-0">
+        <thead>
+          <tr>
+            <th>Module</th>
+            {% for action_code, action_label in actions %}
+              <th>{{ action_label }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for module_code, module_label in modules %}
+          <tr>
+            <td>
+              <i class="bi bi-grid-fill module-icon"></i>{{ module_label }}
+            </td>
+            {% for action_code, action_label in actions %}
+              <td>
+                <input type="checkbox" name="perm__{{ module_code }}__{{ action_code }}"
+                       class="form-check-input perm-check"
+                       data-module="{{ module_code }}" data-action="{{ action_code }}">
+              </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="matrix-actions">
+      <a onclick="setAll(true)"><i class="bi bi-check-all me-1"></i>Select all</a>
+      <span style="color:#cbd5e1;">·</span>
+      <a onclick="setAll(false)"><i class="bi bi-x-lg me-1"></i>Clear all</a>
+      <span style="color:#cbd5e1;">·</span>
+      <a onclick="setAction('view', true)"><i class="bi bi-eye me-1"></i>All view</a>
+      <a onclick="setAction('edit', true)"><i class="bi bi-pencil me-1"></i>All edit</a>
+      <a onclick="setAction('export', true)"><i class="bi bi-download me-1"></i>All export</a>
+    </div>
+  </div>
+
+  <hr class="section-rule">
+  <div class="d-flex gap-2 justify-content-end">
+    <a href="{% url 'accounts:role_list' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:7px;">Cancel</a>
+    <button type="submit" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:7px;">
+      <i class="bi bi-check2 me-1"></i>Create role
+    </button>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function setAll(checked) {
+  document.querySelectorAll('.perm-check').forEach(cb => cb.checked = checked);
+}
+function setAction(action, checked) {
+  document.querySelectorAll(`.perm-check[data-action="${action}"]`).forEach(cb => cb.checked = checked);
+}
+</script>
+{% endblock %}

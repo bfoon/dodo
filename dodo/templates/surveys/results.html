@@ -1,79 +1,404 @@
 {% extends 'base.html' %}
-{% block title %}Thank you — {{ survey.title }}{% endblock %}
+{% block title %}Results — {{ survey.title }}{% endblock %}
 
 {% block breadcrumb %}
-<li class="breadcrumb-item active">{{ survey.title|truncatechars:50 }}</li>
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'surveys:list' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Surveys</a></li>
+<li class="breadcrumb-item"><a href="{% url 'surveys:detail' survey.pk %}" class="text-decoration-none" style="color:var(--dodo-blue);">{{ survey.title|truncatechars:30 }}</a></li>
+<li class="breadcrumb-item active">Results</li>
 {% endblock %}
 
 {% block extra_css %}
 <style>
-.thankyou-wrap { max-width:640px; margin:2rem auto 0; }
-.thankyou-card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:2.5rem 2rem; text-align:center; border-top:4px solid #16a34a; }
-.check-circle { width:72px; height:72px; border-radius:50%; background:rgba(22,163,74,0.12); color:#16a34a; display:inline-flex; align-items:center; justify-content:center; font-size:2.5rem; margin-bottom:1rem; animation:pop .4s ease-out; }
-@keyframes pop {
-  0% { transform:scale(0.5); opacity:0; }
-  60% { transform:scale(1.1); }
-  100% { transform:scale(1); opacity:1; }
-}
-.thankyou-card h1 { font-weight:700; color:#0f172a; font-size:1.75rem; margin-bottom:.5rem; }
-.thankyou-card .sub { font-size:0.95rem; color:#64748b; line-height:1.55; margin-bottom:1.5rem; }
-.survey-ref { font-size:0.78rem; color:#94a3b8; padding:.75rem 1rem; background:#f8fafc; border-radius:8px; margin-bottom:1.5rem; }
-.survey-ref .title { color:#0f172a; font-weight:600; font-size:0.85rem; margin-bottom:.15rem; }
-.next-actions { display:flex; gap:.75rem; justify-content:center; flex-wrap:wrap; }
-.next-actions .btn { border-radius:8px; font-size:0.85rem; padding:.5rem 1.1rem; }
+.results-banner { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:1rem 1.25rem; margin-bottom:1rem; display:flex; align-items:center; gap:1rem; }
+.results-banner .swatch { width:48px; height:48px; border-radius:12px; background:rgba(0,119,200,0.12); color:var(--dodo-blue); display:inline-flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0; }
+.results-banner h1 { font-size:1.15rem; font-weight:700; color:#0f172a; margin:0; }
+.results-banner .sub { font-size:0.82rem; color:#64748b; margin-top:.15rem; }
+
+.kpi-strip { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:.75rem; margin-bottom:1rem; }
+.kpi-tile { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:.85rem 1rem; }
+.kpi-tile .lbl { font-size:0.7rem; text-transform:uppercase; letter-spacing:.04em; font-weight:600; color:#64748b; }
+.kpi-tile .val { font-size:1.7rem; font-weight:700; color:#0f172a; line-height:1.05; margin-top:.25rem; }
+.kpi-tile .val.green { color:#16a34a; }
+.kpi-tile .val.amber { color:#f59e0b; }
+.kpi-tile .val.purple { color:#7c3aed; }
+.kpi-tile .sub { font-size:0.72rem; color:#94a3b8; margin-top:.15rem; }
+
+.chart-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem 1.1rem; margin-bottom:1rem; }
+.chart-card .chart-title { font-size:0.82rem; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem; }
+.chart-card .chart-title i { color:var(--dodo-blue); }
+.chart-card .chart-sub { font-size:0.78rem; color:#64748b; margin-bottom:.75rem; }
+
+.q-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.1rem 1.2rem; margin-bottom:1rem; }
+.q-card .q-num { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:50%; background:#f0f7ff; color:var(--dodo-blue); font-size:0.78rem; font-weight:700; flex-shrink:0; }
+.q-card .q-head { display:flex; gap:.7rem; align-items:flex-start; margin-bottom:.4rem; }
+.q-card .q-text { font-size:0.95rem; font-weight:600; color:#0f172a; line-height:1.4; flex-grow:1; }
+.q-card .q-meta { font-size:0.72rem; color:#94a3b8; margin-left:auto; flex-shrink:0; white-space:nowrap; }
+.q-card .q-type-chip { font-size:0.68rem; padding:.18rem .5rem; border-radius:6px; background:#f1f5f9; color:#475569; font-weight:600; text-transform:uppercase; letter-spacing:.03em; margin-left:.5rem; }
+.q-card .q-required { color:#dc2626; font-weight:700; }
+
+.q-stats { display:flex; gap:1.25rem; flex-wrap:wrap; padding:.5rem 0 .8rem; font-size:0.78rem; color:#475569; border-bottom:1px dashed #e2e8f0; margin-bottom:.75rem; }
+.q-stats .stat { display:inline-flex; align-items:center; gap:.35rem; }
+.q-stats .stat .num { font-weight:700; color:#0f172a; }
+
+.q-empty { padding:2rem 1rem; text-align:center; color:#94a3b8; font-size:0.82rem; }
+.q-empty i { font-size:1.4rem; display:block; margin-bottom:.4rem; }
+
+.text-samples { background:#fafbfc; border:1px solid #f1f5f9; border-radius:10px; padding:.6rem .8rem; max-height:280px; overflow-y:auto; }
+.text-samples .quote { font-size:0.84rem; color:#334155; padding:.5rem 0; border-bottom:1px dashed #e2e8f0; line-height:1.5; }
+.text-samples .quote:last-child { border-bottom:none; }
+.text-samples .quote::before { content:'\201C'; color:var(--dodo-blue); font-size:1.3rem; margin-right:.25rem; vertical-align:-3px; }
+.text-samples .quote::after { content:'\201D'; color:var(--dodo-blue); font-size:1.3rem; margin-left:.25rem; vertical-align:-3px; }
+
+.scale-summary { display:grid; grid-template-columns:repeat(auto-fit, minmax(80px, 1fr)); gap:.5rem; margin-top:.5rem; }
+.scale-summary .stat { background:#fafbfc; padding:.5rem; border-radius:7px; text-align:center; border:1px solid #f1f5f9; }
+.scale-summary .stat .lbl { font-size:0.66rem; text-transform:uppercase; color:#64748b; font-weight:600; }
+.scale-summary .stat .val { font-size:1.05rem; font-weight:700; color:#0f172a; margin-top:.15rem; }
+
+.recent-table { font-size:0.84rem; }
+.recent-table thead th { font-size:0.7rem; text-transform:uppercase; letter-spacing:.03em; color:#64748b; font-weight:600; background:#f8fafc; padding:.55rem .8rem; }
+.recent-table tbody td { padding:.55rem .8rem; vertical-align:middle; }
+.recent-table tbody tr:hover { background:#fafbfc; }
+
+.section-header { font-size:0.82rem; font-weight:700; color:#0f172a; margin:1.5rem 0 .5rem; display:flex; align-items:center; gap:.5rem; }
+.section-header i { color:var(--dodo-blue); }
+
+.no-data { padding:3rem 1rem; text-align:center; color:#64748b; }
+.no-data i { font-size:2.5rem; color:#cbd5e1; display:block; margin-bottom:.5rem; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="thankyou-wrap">
-  <div class="thankyou-card">
-    <div class="check-circle">
-      <i class="bi bi-check-lg"></i>
-    </div>
-    <h1>Thank you!</h1>
+<div class="results-banner">
+  <div class="swatch"><i class="bi bi-bar-chart-line-fill"></i></div>
+  <div style="flex-grow:1;">
+    <h1>{{ survey.title }}</h1>
     <div class="sub">
-      Your response has been recorded successfully.
-      {% if not survey.is_anonymous %}We've saved your answers with your name attached.{% else %}Your answers have been submitted anonymously.{% endif %}
-    </div>
-
-    <div class="survey-ref">
-      <div class="title">{{ survey.title }}</div>
-      <div>
-        <i class="bi bi-tag me-1"></i>{{ survey.get_survey_type_display }}
-        {% if survey.project %} · <i class="bi bi-folder me-1"></i>{{ survey.project.display_title|truncatechars:40 }}{% endif %}
-      </div>
-    </div>
-
-    <div class="next-actions">
-      {% if user.is_authenticated %}
-        <a href="{% url 'surveys:list' %}" class="btn btn-outline-secondary">
-          <i class="bi bi-list-ul me-1"></i>All Surveys
-        </a>
-        {% if user.is_staff %}
-        <a href="{% url 'surveys:results' survey.pk %}" class="btn" style="background:var(--dodo-blue);color:#fff;">
-          <i class="bi bi-bar-chart me-1"></i>View Results
-        </a>
-        {% endif %}
-        <a href="{% url 'dashboard:home' %}" class="btn btn-outline-primary">
-          <i class="bi bi-house me-1"></i>Dashboard
-        </a>
-      {% else %}
-        {% if survey.status == 'active' %}
-        <a href="{% url 'surveys:respond' survey.pk %}" class="btn btn-outline-secondary">
-          <i class="bi bi-arrow-repeat me-1"></i>Submit Another Response
-        </a>
-        {% endif %}
+      <i class="bi bi-tag me-1"></i>{{ survey.get_survey_type_display }}
+      <span class="ms-2" style="color:#cbd5e1;">·</span>
+      <span class="ms-2"><i class="bi bi-people me-1"></i>{{ total_responses }} response{{ total_responses|pluralize }}</span>
+      {% if survey.is_anonymous %}
+        <span class="ms-2" style="color:#cbd5e1;">·</span>
+        <span class="ms-2"><i class="bi bi-eye-slash me-1"></i>Anonymous</span>
       {% endif %}
     </div>
   </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'surveys:detail' survey.pk %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+    <a href="{% url 'surveys:builder' survey.pk %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-pencil-square me-1"></i>Builder
+    </a>
+  </div>
+</div>
 
-  <div class="text-center mt-3" style="font-size:0.78rem;color:#94a3b8;">
-    <i class="bi bi-shield-check me-1"></i>
-    {% if survey.is_anonymous %}
-      This response has been stored anonymously. No identifying information was linked to your answers.
+{% if total_responses == 0 %}
+<div class="card">
+  <div class="no-data">
+    <i class="bi bi-bar-chart"></i>
+    <div style="font-size:0.92rem;font-weight:600;color:#1e293b;">No responses yet</div>
+    <p style="font-size:0.83rem;max-width:420px;margin:.5rem auto 1rem;">
+      Once respondents start submitting answers, this page will fill up with charts, summary statistics, and (if you collect locations) an interactive map.
+    </p>
+    {% if survey.status == 'active' %}
+    <a href="{% url 'surveys:respond' survey.pk %}" target="_blank" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:7px;">
+      <i class="bi bi-link-45deg me-1"></i>Open response form
+    </a>
     {% else %}
-      Your response has been stored securely. Contact the M&E team if you need to correct it.
+    <a href="{% url 'surveys:builder' survey.pk %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:7px;">
+      <i class="bi bi-toggle-on me-1"></i>Activate survey
+    </a>
     {% endif %}
   </div>
 </div>
+
+{% else %}
+
+<!-- KPI strip -->
+<div class="kpi-strip">
+  <div class="kpi-tile">
+    <div class="lbl">Total responses</div>
+    <div class="val">{{ total_responses }}</div>
+  </div>
+  <div class="kpi-tile">
+    <div class="lbl">Completed</div>
+    <div class="val green">{{ complete_responses }}</div>
+    <div class="sub">{{ completion_rate }}% completion rate</div>
+  </div>
+  <div class="kpi-tile">
+    <div class="lbl">Questions</div>
+    <div class="val purple">{{ question_count }}</div>
+    <div class="sub">{{ required_count }} required</div>
+  </div>
+  <div class="kpi-tile">
+    <div class="lbl">Avg. time to complete</div>
+    <div class="val amber" id="avgDuration">{{ avg_duration }}s</div>
+    <div class="sub">across complete responses</div>
+  </div>
+</div>
+
+<!-- Top charts -->
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="chart-card">
+      <div class="chart-title"><i class="bi bi-graph-up"></i>Response volume over time</div>
+      <div class="chart-sub">Daily submissions since the survey opened</div>
+      <div id="timelineChart" style="min-height:240px;"></div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="chart-card">
+      <div class="chart-title"><i class="bi bi-pie-chart"></i>Question types in this survey</div>
+      <div class="chart-sub">Mix of question formats used</div>
+      <div id="qtypeChart" style="min-height:240px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Map (if any geo question has data) -->
+{% if has_geo %}
+<div class="section-header"><i class="bi bi-geo-alt-fill"></i>Response locations</div>
+<div class="chart-card" style="padding:0;overflow:hidden;">
+  <div id="responseMap" style="height:480px;"></div>
+</div>
+{% endif %}
+
+<!-- Per-question analytics -->
+<div class="section-header"><i class="bi bi-list-check"></i>Per-question analysis</div>
+
+{% if question_blocks %}
+{% for q in question_blocks %}
+<div class="q-card">
+  <div class="q-head">
+    <span class="q-num">{{ q.order }}</span>
+    <div class="q-text">
+      {{ q.text }}
+      {% if q.is_required %}<span class="q-required">*</span>{% endif %}
+      <span class="q-type-chip">{{ q.type_label }}</span>
+    </div>
+    <span class="q-meta">{{ q.answered }} answered · {{ q.skipped }} skipped</span>
+  </div>
+
+  {% if q.description %}
+    <div style="font-size:0.78rem;color:#64748b;margin-bottom:.5rem;">{{ q.description }}</div>
+  {% endif %}
+
+  {% if q.render == 'categorical' %}
+    <div class="q-stats">
+      <span class="stat"><i class="bi bi-bar-chart"></i><span class="num">{{ q.choice_count }}</span>options</span>
+      <span class="stat"><i class="bi bi-check2-circle"></i><span class="num">{{ q.total_picks }}</span>picks</span>
+      {% if q.top_label %}
+      <span class="stat"><i class="bi bi-star-fill" style="color:#f59e0b;"></i>Top: <span class="num">{{ q.top_label|truncatechars:30 }}</span> ({{ q.top_pct }}%)</span>
+      {% endif %}
+      {% if q.multi %}<span class="stat" style="color:#7c3aed;"><i class="bi bi-check2-square"></i>multi-select</span>{% endif %}
+    </div>
+    <div id="chart_{{ q.id }}"></div>
+
+  {% elif q.render == 'numeric_scale' %}
+    <div class="q-stats">
+      <span class="stat"><i class="bi bi-rulers"></i>Scale <span class="num">{{ q.scale_label }}</span></span>
+      <span class="stat"><i class="bi bi-people"></i><span class="num">{{ q.count }}</span>responses</span>
+    </div>
+    <div id="chart_{{ q.id }}"></div>
+    <div class="scale-summary">
+      <div class="stat"><div class="lbl">Mean</div><div class="val">{{ q.mean }}</div></div>
+      <div class="stat"><div class="lbl">Median</div><div class="val">{{ q.median }}</div></div>
+      <div class="stat"><div class="lbl">Min</div><div class="val">{{ q.min }}</div></div>
+      <div class="stat"><div class="lbl">Max</div><div class="val">{{ q.max }}</div></div>
+    </div>
+
+  {% elif q.render == 'number' %}
+    <div class="q-stats">
+      <span class="stat"><i class="bi bi-people"></i><span class="num">{{ q.count }}</span>values</span>
+      <span class="stat">Mean <span class="num">{{ q.mean }}</span></span>
+      <span class="stat">Median <span class="num">{{ q.median }}</span></span>
+      <span class="stat">Range <span class="num">{{ q.min }}–{{ q.max }}</span></span>
+    </div>
+    <div id="chart_{{ q.id }}"></div>
+
+  {% elif q.render == 'date' %}
+    <div class="q-stats">
+      <span class="stat"><i class="bi bi-calendar3"></i><span class="num">{{ q.count }}</span>dates</span>
+      <span class="stat">Earliest: <span class="num">{{ q.min_date }}</span></span>
+      <span class="stat">Latest: <span class="num">{{ q.max_date }}</span></span>
+    </div>
+    <div id="chart_{{ q.id }}"></div>
+
+  {% elif q.render == 'text' %}
+    <div class="q-stats">
+      <span class="stat"><i class="bi bi-chat-quote"></i><span class="num">{{ q.count }}</span>text response{{ q.count|pluralize }}</span>
+      <span class="stat">Avg length <span class="num">{{ q.avg_length }}</span> chars</span>
+    </div>
+    <div class="row g-3">
+      {% if q.word_chart %}
+      <div class="col-md-5">
+        <div style="font-size:0.74rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.03em;margin-bottom:.4rem;">
+          <i class="bi bi-tag me-1"></i>Most-used words
+        </div>
+        <div id="chart_{{ q.id }}"></div>
+      </div>
+      {% endif %}
+      <div class="{% if q.word_chart %}col-md-7{% else %}col-12{% endif %}">
+        <div style="font-size:0.74rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.03em;margin-bottom:.4rem;">
+          <i class="bi bi-quote me-1"></i>Sample answers ({{ q.samples|length }})
+        </div>
+        <div class="text-samples">
+          {% for s in q.samples %}
+            <div class="quote">{{ s|truncatechars:300 }}</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+  {% elif q.render == 'geo_summary' %}
+    <div class="q-stats">
+      <span class="stat"><i class="bi bi-geo-alt-fill" style="color:#0077c8;"></i><span class="num">{{ q.count }}</span>valid location{{ q.count|pluralize }}</span>
+      {% if q.first_point %}
+      <span class="stat" style="color:#94a3b8;">e.g. {{ q.first_point.lat|floatformat:4 }}, {{ q.first_point.lng|floatformat:4 }}{% if q.first_point.label %} · {{ q.first_point.label }}{% endif %}</span>
+      {% endif %}
+    </div>
+    <div style="font-size:0.78rem;color:#64748b;padding:.5rem 0;">
+      <i class="bi bi-info-circle me-1"></i>See the map at the top of this page for all geographic responses.
+    </div>
+
+  {% elif q.render == 'simple_count' %}
+    <div class="q-stats">
+      <span class="stat">{{ q.detail }}</span>
+    </div>
+
+  {% elif q.render == 'empty' %}
+    <div class="q-empty">
+      <i class="bi bi-inbox"></i>
+      No answers recorded for this question yet.
+    </div>
+
+  {% else %}
+    <div class="q-empty">
+      <i class="bi bi-question-circle"></i>
+      This question type isn't supported by the analytics view yet. {{ q.answered }} response{{ q.answered|pluralize }}.
+    </div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Recent submissions -->
+<div class="section-header"><i class="bi bi-clock-history"></i>Recent submissions</div>
+<div class="chart-card" style="padding:0;overflow:hidden;">
+  <div class="table-responsive">
+    <table class="table recent-table mb-0">
+      <thead>
+        <tr>
+          <th style="padding-left:1rem;">#</th>
+          <th>Respondent</th>
+          <th>Started</th>
+          <th>Completed</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in recent %}
+        <tr>
+          <td style="padding-left:1rem;color:#94a3b8;">#{{ r.pk }}</td>
+          <td>
+            {% if survey.is_anonymous %}
+              <span style="color:#94a3b8;"><i class="bi bi-eye-slash me-1"></i>Anonymous</span>
+            {% elif r.respondent %}
+              <i class="bi bi-person-circle me-1" style="color:#94a3b8;"></i>{{ r.respondent.get_full_name|default:r.respondent.email }}
+            {% elif r.respondent_name %}
+              <i class="bi bi-person me-1" style="color:#94a3b8;"></i>{{ r.respondent_name }}
+            {% else %}
+              <span style="color:#94a3b8;">—</span>
+            {% endif %}
+          </td>
+          <td style="font-size:0.8rem;color:#475569;">{{ r.started_at|date:"d M Y, H:i" }}</td>
+          <td style="font-size:0.8rem;color:#475569;">
+            {% if r.completed_at %}{{ r.completed_at|date:"d M Y, H:i" }}{% else %}<span style="color:#cbd5e1;">—</span>{% endif %}
+          </td>
+          <td>
+            {% if r.is_complete %}
+              <span class="badge" style="background:#dcfce7;color:#166534;font-size:0.7rem;">Complete</span>
+            {% else %}
+              <span class="badge" style="background:#fef3c7;color:#854d0e;font-size:0.7rem;">In progress</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if total_responses > 0 %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<script id="timelineData" type="application/json">{{ timeline_chart_json|safe }}</script>
+<script id="qtypeData" type="application/json">{{ qtype_chart_json|safe }}</script>
+<script id="questionData" type="application/json">{{ question_blocks_json|safe }}</script>
+{% if has_geo %}
+<script id="mapData" type="application/json">{{ map_block_json|safe }}</script>
+{% endif %}
+
+<script>
+(function(){
+  const config = { displayModeBar: false, responsive: true };
+
+  // Format avg-duration KPI nicely
+  const dur = {{ avg_duration|default:0 }};
+  const durEl = document.getElementById('avgDuration');
+  if (durEl) {
+    if (dur >= 60) durEl.textContent = (dur/60).toFixed(1) + ' min';
+    else if (dur > 0) durEl.textContent = dur + ' s';
+    else durEl.textContent = '—';
+  }
+
+  function plot(elId, dataKey) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const dataEl = document.getElementById(dataKey);
+    if (!dataEl) return;
+    let payload = null;
+    try { payload = JSON.parse(dataEl.textContent); } catch (e) {}
+    if (!payload) return;
+    Plotly.newPlot(el, payload.data, payload.layout || {}, config);
+  }
+
+  plot('timelineChart', 'timelineData');
+  plot('qtypeChart',    'qtypeData');
+
+  // Per-question charts
+  let blocks = [];
+  try { blocks = JSON.parse(document.getElementById('questionData').textContent); } catch (e) {}
+  blocks.forEach(b => {
+    const targetId = 'chart_' + b.id;
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    let chart = null;
+    if (b.render === 'text') chart = b.word_chart;
+    else                     chart = b.chart;
+    if (!chart) return;
+    Plotly.newPlot(el, chart.data, chart.layout || {}, config);
+  });
+
+  // Map
+  const mapEl = document.getElementById('responseMap');
+  const mapDataEl = document.getElementById('mapData');
+  if (mapEl && mapDataEl) {
+    let payload = null;
+    try { payload = JSON.parse(mapDataEl.textContent); } catch (e) {}
+    if (payload) Plotly.newPlot(mapEl, payload.data, payload.layout || {}, config);
+  }
+
+  // Re-render on tab visibility (Plotly sometimes mis-sizes when hidden)
+  window.addEventListener('resize', () => {
+    document.querySelectorAll('[id^="chart_"], #timelineChart, #qtypeChart, #responseMap')
+            .forEach(el => Plotly.Plots.resize(el));
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

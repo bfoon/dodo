@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% block title %}Roles — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'accounts:user_list' %}" style="color:var(--dodo-blue);text-decoration:none;">Users</a></li>
+<li class="breadcrumb-item active">Roles</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.role-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem 1.1rem; margin-bottom:.75rem; transition:all .12s; }
+.role-card:hover { border-color:var(--dodo-blue); box-shadow:0 2px 8px rgba(0,119,200,0.06); }
+.role-card .top { display:flex; align-items:flex-start; gap:.75rem; }
+.role-card .swatch { width:38px; height:38px; border-radius:10px; background:rgba(0,119,200,0.12); color:var(--dodo-blue); display:inline-flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+.role-card h6 { margin:0; font-weight:700; font-size:0.95rem; color:#0f172a; }
+.role-card .co-line { font-size:0.74rem; color:#64748b; margin-top:.15rem; }
+.role-card .desc { font-size:0.8rem; color:#475569; margin-top:.3rem; line-height:1.5; }
+.role-card .perm-grid { display:flex; flex-wrap:wrap; gap:.3rem; margin-top:.6rem; }
+.perm-chip { font-size:0.66rem; font-weight:600; padding:.15rem .45rem; border-radius:5px; background:#f1f5f9; color:#475569; }
+.perm-chip.view { background:rgba(0,119,200,0.12); color:var(--dodo-blue); }
+.perm-chip.edit { background:rgba(245,158,11,0.12); color:#92400e; }
+.perm-chip.create { background:rgba(22,163,74,0.12); color:#166534; }
+.perm-chip.delete { background:rgba(220,38,38,0.12); color:#991b1b; }
+.perm-chip.approve { background:rgba(124,58,237,0.12); color:#7c3aed; }
+.perm-chip.export { background:rgba(8,145,178,0.12); color:#155e75; }
+
+.role-card .actions { display:flex; gap:.3rem; flex-shrink:0; }
+.icon-btn { background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:.18rem .5rem; font-size:0.78rem; color:#64748b; cursor:pointer; line-height:1; text-decoration:none; }
+.icon-btn:hover { background:var(--dodo-blue); color:#fff; border-color:var(--dodo-blue); }
+.icon-btn.danger:hover { background:#dc2626; border-color:#dc2626; }
+
+.no-data { padding:2.5rem 1rem; text-align:center; color:#64748b; }
+.no-data i { font-size:2rem; color:#cbd5e1; display:block; margin-bottom:.5rem; }
+
+.co-group-header { font-size:0.78rem; font-weight:700; color:var(--dodo-blue); padding:.6rem .9rem; background:#f0f7ff; border:1px solid #dbeafe; border-radius:10px; margin-bottom:.5rem; display:flex; align-items:center; gap:.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-shield-fill me-2" style="color:var(--dodo-blue);"></i>Roles</h1>
+    <p class="page-header-sub">Per-country roles with module-level permissions</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'accounts:user_list' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-people me-1"></i>Users
+    </a>
+    {% if can_manage %}
+    <a href="{% url 'accounts:role_create' %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-plus-circle me-1"></i>Add Role
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert" style="font-size:0.85rem;">
+      {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+{% if roles %}
+  {% regroup roles by country_office as roles_by_co %}
+  {% for co_group in roles_by_co %}
+    <div class="co-group-header">
+      <i class="bi bi-globe2"></i>{{ co_group.grouper.name }}
+      <span class="ms-auto" style="font-size:0.72rem;font-weight:500;color:#64748b;">
+        {{ co_group.list|length }} role{{ co_group.list|length|pluralize }}
+      </span>
+    </div>
+    {% for role in co_group.list %}
+    <div class="role-card">
+      <div class="top">
+        <div class="swatch"><i class="bi bi-shield-fill"></i></div>
+        <div style="flex-grow:1;min-width:0;">
+          <h6>{{ role.name }}
+            {% if not role.is_active %}
+              <span class="badge ms-1" style="background:#f1f5f9;color:#64748b;font-size:0.66rem;">Inactive</span>
+            {% endif %}
+          </h6>
+          <div class="co-line">
+            <i class="bi bi-tag me-1"></i>{{ role.code }} · {{ role.permissions.count }} permission{{ role.permissions.count|pluralize }}
+          </div>
+          {% if role.description %}<div class="desc">{{ role.description|truncatechars:180 }}</div>{% endif %}
+          <div class="perm-grid">
+            {% for p in role.permissions.all|slice:":12" %}
+              <span class="perm-chip {{ p.action }}">{{ p.module }}:{{ p.action }}</span>
+            {% endfor %}
+            {% if role.permissions.count > 12 %}
+              <span class="perm-chip">+{{ role.permissions.count|add:"-12" }} more</span>
+            {% endif %}
+            {% if role.permissions.count == 0 %}
+              <span style="font-size:0.74rem;color:#94a3b8;font-style:italic;">No permissions assigned yet.</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="actions">
+          <a href="{% url 'accounts:role_permissions' role.pk %}" class="icon-btn" title="Permissions">
+            <i class="bi bi-{% if can_manage %}sliders{% else %}eye{% endif %}"></i>
+          </a>
+          {% if can_manage %}
+          <form method="post" action="{% url 'accounts:role_delete' role.pk %}" class="d-inline"
+                onsubmit="return confirm('Delete role &quot;{{ role.name|escapejs }}&quot;? This cannot be undone.');">
+            {% csrf_token %}
+            <button type="submit" class="icon-btn danger" title="Delete">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  {% endfor %}
+{% else %}
+<div class="card">
+  <div class="no-data">
+    <i class="bi bi-shield"></i>
+    <div style="font-size:0.92rem;font-weight:600;color:#1e293b;">No roles yet</div>
+    <p style="font-size:0.83rem;max-width:420px;margin:.5rem auto 1rem;">
+      Roles bundle module-level permissions and are granted to users per country office.
+    </p>
+    {% if can_manage %}
+    <a href="{% url 'accounts:role_create' %}" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:7px;">
+      <i class="bi bi-plus-circle me-1"></i>Create the first role
+    </a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

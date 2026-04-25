@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+{% block title %}Access — {{ target_user.get_full_name|default:target_user.email }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'accounts:user_list' %}" style="color:var(--dodo-blue);text-decoration:none;">Users</a></li>
+<li class="breadcrumb-item active">Access</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.user-banner { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:1rem 1.25rem; margin-bottom:1rem; display:flex; align-items:center; gap:1rem; }
+.avatar { width:54px; height:54px; border-radius:50%; background:#f0f7ff; color:var(--dodo-blue); display:inline-flex; align-items:center; justify-content:center; font-size:1.1rem; font-weight:700; overflow:hidden; flex-shrink:0; }
+.avatar img { width:100%; height:100%; object-fit:cover; }
+
+.section-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem 1.25rem; margin-bottom:1rem; }
+.section-title { font-size:0.82rem; font-weight:700; color:#0f172a; margin-bottom:.75rem; display:flex; align-items:center; gap:.5rem; }
+.section-title i { color:var(--dodo-blue); }
+
+.access-row { display:flex; align-items:center; gap:.75rem; padding:.6rem .75rem; border:1px solid #e2e8f0; border-radius:10px; background:#fafbfc; margin-bottom:.5rem; font-size:0.86rem; }
+.access-row.revoked { opacity:.6; }
+.co-pill { font-size:0.7rem; font-weight:700; padding:.2rem .55rem; border-radius:6px; background:rgba(0,119,200,0.12); color:var(--dodo-blue); white-space:nowrap; }
+.role-pill { font-size:0.74rem; padding:.18rem .55rem; border-radius:10px; background:#f1f5f9; color:#475569; white-space:nowrap; }
+.granted { font-size:0.72rem; color:#94a3b8; margin-left:auto; white-space:nowrap; }
+
+.label { font-size:0.78rem; font-weight:600; color:#374151; margin-bottom:.25rem; }
+.icon-btn { background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:.18rem .5rem; font-size:0.78rem; color:#64748b; cursor:pointer; line-height:1; }
+.icon-btn.danger:hover { background:#dc2626; color:#fff; border-color:#dc2626; }
+.icon-btn.success:hover { background:#16a34a; color:#fff; border-color:#16a34a; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title"><i class="bi bi-shield-lock me-2" style="color:var(--dodo-blue);"></i>Manage Access</h1>
+    <p class="page-header-sub">Grant or revoke country-office access for this user</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'accounts:user_edit' target_user.pk %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-pencil me-1"></i>Edit profile
+    </a>
+    <a href="{% url 'accounts:user_list' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+  </div>
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert" style="font-size:0.85rem;">
+      {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<div class="user-banner">
+  <span class="avatar">
+    {% if target_user.profile_photo %}
+      <img src="{{ target_user.profile_photo.url }}" alt="">
+    {% else %}
+      {{ target_user.first_name|slice:":1" }}{{ target_user.last_name|slice:":1" }}
+    {% endif %}
+  </span>
+  <div style="flex-grow:1;">
+    <div style="font-size:1rem;font-weight:700;color:#0f172a;">{{ target_user.get_full_name|default:target_user.email }}</div>
+    <div style="font-size:0.82rem;color:#64748b;">
+      {{ target_user.email }}
+      {% if target_user.position %} · {{ target_user.position }}{% endif %}
+    </div>
+    {% if target_user.is_global_admin %}
+      <span class="badge mt-1" style="background:#fef3c7;color:#854d0e;font-size:0.7rem;">
+        <i class="bi bi-shield-check me-1"></i>Global admin
+      </span>
+    {% endif %}
+    {% if not target_user.is_active %}
+      <span class="badge mt-1" style="background:#fee2e2;color:#991b1b;font-size:0.7rem;">
+        <i class="bi bi-x-circle me-1"></i>Account disabled
+      </span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Active access -->
+  <div class="col-lg-7">
+    <div class="section-card">
+      <div class="section-title"><i class="bi bi-check-circle-fill"></i>Active access ({{ accesses|length }})</div>
+      {% if accesses %}
+        {% for a in accesses %}
+        <div class="access-row">
+          <span class="co-pill">{{ a.country_office.code }}</span>
+          <div>
+            <div style="font-weight:500;color:#0f172a;">{{ a.country_office.name }}</div>
+            <div style="margin-top:.15rem;"><span class="role-pill"><i class="bi bi-shield me-1"></i>{{ a.role.name }}</span></div>
+          </div>
+          <span class="granted">
+            {% if a.granted_by %}by {{ a.granted_by.get_full_name|default:a.granted_by.email }} · {% endif %}
+            {{ a.granted_at|date:"d M Y" }}
+          </span>
+          <form method="post" class="d-inline" onsubmit="return confirm('Revoke {{ target_user.get_full_name|default:target_user.email|escapejs }}\u2019s access to {{ a.country_office.name|escapejs }} as {{ a.role.name|escapejs }}?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="revoke">
+            <input type="hidden" name="access_id" value="{{ a.pk }}">
+            <button type="submit" class="icon-btn danger" title="Revoke">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </form>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="font-size:0.82rem;color:#64748b;padding:.75rem;border:1px dashed #e2e8f0;border-radius:8px;text-align:center;">
+          <i class="bi bi-info-circle me-1"></i>This user has no active access.
+        </div>
+      {% endif %}
+    </div>
+
+    {% if revoked_accesses %}
+    <div class="section-card">
+      <div class="section-title"><i class="bi bi-archive"></i>Revoked / inactive ({{ revoked_accesses|length }})</div>
+      {% for a in revoked_accesses %}
+      <div class="access-row revoked">
+        <span class="co-pill">{{ a.country_office.code }}</span>
+        <div>
+          <div style="font-weight:500;color:#0f172a;">{{ a.country_office.name }}</div>
+          <div style="margin-top:.15rem;"><span class="role-pill">{{ a.role.name }}</span></div>
+        </div>
+        <span class="granted">Granted {{ a.granted_at|date:"d M Y" }}</span>
+        <form method="post" class="d-inline">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="reactivate">
+          <input type="hidden" name="access_id" value="{{ a.pk }}">
+          <button type="submit" class="icon-btn success" title="Reactivate">
+            <i class="bi bi-arrow-counterclockwise"></i>
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Grant new -->
+  <div class="col-lg-5">
+    <div class="section-card">
+      <div class="section-title"><i class="bi bi-plus-circle-fill"></i>Grant new access</div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="grant">
+        <div class="mb-3">
+          <div class="label">Country office *</div>
+          {{ access_form.country_office }}
+        </div>
+        <div class="mb-3">
+          <div class="label">Role *</div>
+          {{ access_form.role }}
+        </div>
+        <div class="mb-3">
+          <div class="label">Notes</div>
+          {{ access_form.notes }}
+        </div>
+        <button type="submit" class="btn btn-sm w-100" style="background:var(--dodo-blue);color:#fff;border-radius:7px;">
+          <i class="bi bi-check2 me-1"></i>Grant access
+        </button>
+      </form>
+
+      <div style="font-size:0.74rem;color:#94a3b8;margin-top:.75rem;line-height:1.5;">
+        <i class="bi bi-info-circle me-1"></i>
+        Roles are scoped to a single country office. To give access in multiple offices, grant each one separately.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

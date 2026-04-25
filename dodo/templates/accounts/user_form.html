@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block title %}{% if mode == 'edit' %}Edit User{% else %}Add User{% endif %} — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'accounts:user_list' %}" style="color:var(--dodo-blue);text-decoration:none;">Users</a></li>
+<li class="breadcrumb-item active">{% if mode == 'edit' %}Edit{% else %}Add{% endif %}</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:1.25rem 1.5rem; }
+.section-title { font-size:0.82rem; font-weight:700; color:#0f172a; margin-bottom:.75rem; display:flex; align-items:center; gap:.5rem; }
+.section-title i { color:var(--dodo-blue); }
+.label { font-size:0.78rem; font-weight:600; color:#374151; margin-bottom:.25rem; }
+.help-text { font-size:0.74rem; color:#94a3b8; margin-top:.25rem; }
+.error-text { font-size:0.74rem; color:#dc2626; margin-top:.25rem; }
+hr.section-rule { border-color:#e2e8f0; margin:1.25rem 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title">
+      <i class="bi bi-{% if mode == 'edit' %}pencil-square{% else %}person-plus-fill{% endif %} me-2" style="color:var(--dodo-blue);"></i>
+      {% if mode == 'edit' %}Edit user{% else %}Add user{% endif %}
+    </h1>
+    <p class="page-header-sub">
+      {% if mode == 'edit' %}Update profile and access settings{% else %}Create a user and grant initial access{% endif %}
+    </p>
+  </div>
+  <div>
+    <a href="{% url 'accounts:user_list' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-arrow-left me-1"></i>Back to users
+    </a>
+  </div>
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert" style="font-size:0.85rem;">
+      {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+{% if form.non_field_errors %}
+<div class="alert alert-danger" style="font-size:0.84rem;">
+  {{ form.non_field_errors }}
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" class="form-card">
+  {% csrf_token %}
+
+  <div class="section-title"><i class="bi bi-person-fill"></i>Personal information</div>
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="label">Email *</div>
+      {{ form.email }}
+      {% if form.email.errors %}<div class="error-text">{{ form.email.errors.0 }}</div>{% endif %}
+    </div>
+    <div class="col-md-4">
+      <div class="label">First name *</div>
+      {{ form.first_name }}
+      {% if form.first_name.errors %}<div class="error-text">{{ form.first_name.errors.0 }}</div>{% endif %}
+    </div>
+    <div class="col-md-4">
+      <div class="label">Last name *</div>
+      {{ form.last_name }}
+      {% if form.last_name.errors %}<div class="error-text">{{ form.last_name.errors.0 }}</div>{% endif %}
+    </div>
+    <div class="col-md-4">
+      <div class="label">Phone</div>
+      {{ form.phone }}
+    </div>
+    <div class="col-md-4">
+      <div class="label">Position</div>
+      {{ form.position }}
+    </div>
+    <div class="col-md-4">
+      <div class="label">Profile photo</div>
+      {{ form.profile_photo }}
+    </div>
+  </div>
+
+  <hr class="section-rule">
+
+  <div class="section-title"><i class="bi bi-shield-fill"></i>Account & access</div>
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="label">Primary country office</div>
+      {{ form.primary_country_office }}
+      <div class="help-text">The office this user belongs to by default.</div>
+    </div>
+    {% if mode != 'edit' %}
+    <div class="col-md-6">
+      <div class="label">Initial password</div>
+      {{ form.password }}
+      <div class="help-text">Leave blank to use the default initial password (the user should change it on first login).</div>
+      {% if form.password.errors %}<div class="error-text">{{ form.password.errors.0 }}</div>{% endif %}
+    </div>
+    {% endif %}
+    <div class="col-md-6">
+      <div class="form-check">
+        {{ form.is_global_admin }}
+        <label class="form-check-label" style="font-size:0.86rem;">Global admin</label>
+        <div class="help-text">Bypasses country-office restrictions.</div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="form-check">
+        {{ form.is_active }}
+        <label class="form-check-label" style="font-size:0.86rem;">Account active</label>
+        <div class="help-text">Disabled users cannot log in.</div>
+      </div>
+    </div>
+  </div>
+
+  {% if mode != 'edit' and access_form %}
+  <hr class="section-rule">
+  <div class="section-title"><i class="bi bi-globe2"></i>Initial access (optional)</div>
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="label">Country office</div>
+      {{ access_form.country_office }}
+    </div>
+    <div class="col-md-4">
+      <div class="label">Role</div>
+      {{ access_form.role }}
+    </div>
+    <div class="col-md-4">
+      <div class="label">Notes</div>
+      {{ access_form.notes }}
+    </div>
+  </div>
+  <div class="help-text mt-2">
+    <i class="bi bi-info-circle me-1"></i>If you skip this, you can grant access later from the user's "Access" page.
+  </div>
+  {% endif %}
+
+  <hr class="section-rule">
+  <div class="d-flex gap-2 justify-content-end">
+    <a href="{% url 'accounts:user_list' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:7px;">Cancel</a>
+    <button type="submit" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:7px;">
+      <i class="bi bi-check2 me-1"></i>{% if mode == 'edit' %}Save changes{% else %}Create user{% endif %}
+    </button>
+  </div>
+</form>
+{% endblock %}

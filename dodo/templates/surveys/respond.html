@@ -1,9 +1,5 @@
-{% extends 'base.html' %}
+{% extends 'surveys/public_base.html' %}
 {% block title %}{{ survey.title }}{% endblock %}
-
-{% block breadcrumb %}
-<li class="breadcrumb-item active">{{ survey.title|truncatechars:50 }}</li>
-{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
@@ -12,8 +8,8 @@
 .geo-toolbar { display:flex; gap:.4rem; margin-bottom:.5rem; flex-wrap:wrap; }
 .geo-toolbar .btn { font-size:0.78rem; border-radius:7px; padding:.3rem .65rem; display:inline-flex; align-items:center; gap:.35rem; }
 .geo-toolbar .btn-locate { background:var(--dodo-blue); color:#fff; border:1px solid var(--dodo-blue); }
-.geo-toolbar .btn-locate:hover { background:#005ea0; color:#fff; }
-.geo-toolbar .btn-ip { background:#fff; color:#475569; border:1px solid #e2e8f0; }
+.geo-toolbar .btn-locate:hover { background:var(--dodo-blue-dark); color:#fff; }
+.geo-toolbar .btn-ip { background:#fff; color:#475569; border:1px solid var(--border); }
 .geo-toolbar .btn-ip:hover { border-color:var(--dodo-blue); color:var(--dodo-blue); }
 .geo-toolbar .btn-clear { background:transparent; color:#94a3b8; border:1px solid transparent; }
 .geo-toolbar .btn-clear:hover { color:#dc2626; }
@@ -27,7 +23,7 @@
 .geo-status.ok { color:#16a34a; }
 .geo-status.err { color:#dc2626; }
 .geo-map {
-  height:220px; border-radius:10px; border:1px solid #e2e8f0;
+  height:220px; border-radius:10px; border:1px solid var(--border);
   margin-top:.5rem; background:#f8fafc;
   position:relative; overflow:hidden;
 }
@@ -44,17 +40,15 @@
 }
 .geo-coords-row { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; }
 @media (max-width:480px) { .geo-coords-row { grid-template-columns:1fr; } }
-</style>
-<style>
-.respond-wrap { max-width:760px; margin:0 auto; }
-.intro-card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:1.5rem 1.75rem; margin-bottom:1rem; border-top:4px solid var(--dodo-blue); }
-.intro-card h2 { font-weight:700; color:#0f172a; font-size:1.35rem; line-height:1.3; margin-bottom:.5rem; }
+
+.intro-card { background:#fff; border:1px solid var(--border); border-radius:14px; padding:1.5rem 1.75rem; margin-bottom:1rem; border-top:4px solid var(--dodo-blue); }
+.intro-card h2 { font-weight:700; color:var(--text); font-size:1.35rem; line-height:1.3; margin-bottom:.5rem; }
 .intro-card .type-chip { display:inline-block; font-size:0.7rem; padding:.2rem .55rem; border-radius:20px; background:rgba(0,119,200,0.12); color:var(--dodo-blue); font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin-bottom:.5rem; }
 .intro-card .desc { font-size:0.92rem; color:#475569; line-height:1.55; }
 .intro-card .instructions { font-size:0.86rem; color:#475569; background:#fafbfc; border-left:4px solid var(--dodo-blue); padding:.75rem 1rem; border-radius:0 8px 8px 0; margin-top:1rem; white-space:pre-wrap; }
-.intro-card .privacy-note { font-size:0.78rem; color:#64748b; margin-top:.75rem; padding-top:.75rem; border-top:1px dashed #e2e8f0; }
+.intro-card .privacy-note { font-size:0.78rem; color:#64748b; margin-top:.75rem; padding-top:.75rem; border-top:1px dashed var(--border); }
 
-.q-block { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.25rem 1.5rem; margin-bottom:.85rem; position:relative; transition:all .15s; }
+.q-block { background:#fff; border:1px solid var(--border); border-radius:12px; padding:1.25rem 1.5rem; margin-bottom:.85rem; position:relative; transition:all .15s; }
 .q-block:hover { border-color:#cbd5e1; }
 .q-block:focus-within { border-color:var(--dodo-blue); box-shadow:0 0 0 3px rgba(0,119,200,0.08); }
 .q-block .q-number { position:absolute; top:1.25rem; left:-.9rem; width:28px; height:28px; border-radius:50%; background:var(--dodo-blue); color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.78rem; font-weight:700; box-shadow:0 2px 4px rgba(0,0,0,0.1); }
@@ -62,500 +56,396 @@
 .q-block.section-header { background:linear-gradient(135deg, rgba(0,119,200,0.04) 0%, rgba(0,119,200,0.01) 100%); border-color:#bae6fd; }
 .q-block.section-header .q-number { display:none; }
 .q-block.section-header h5 { font-weight:700; color:var(--dodo-blue); font-size:1.05rem; margin-bottom:.25rem; }
-.q-text { font-size:0.95rem; font-weight:600; color:#0f172a; line-height:1.4; margin-bottom:.25rem; }
+.q-text { font-size:0.95rem; font-weight:600; color:var(--text); line-height:1.4; margin-bottom:.25rem; }
 .q-text .req { color:#dc2626; font-weight:700; margin-left:.15rem; }
 .q-desc { font-size:0.78rem; color:#64748b; margin-bottom:.75rem; line-height:1.45; }
 
-.form-control, .form-select { font-size:0.9rem; border-radius:8px; border-color:#e2e8f0; }
-.form-control:focus, .form-select:focus { border-color:var(--dodo-blue); box-shadow:0 0 0 3px rgba(0,119,200,0.12); }
 textarea.form-control { min-height:90px; }
 
-/* Radio / checkbox choices */
 .choice-list { display:flex; flex-direction:column; gap:.4rem; }
-.choice-item { display:flex; gap:.6rem; align-items:center; padding:.55rem .8rem; border:1.5px solid #e2e8f0; border-radius:8px; cursor:pointer; background:#fff; transition:all .12s; font-size:0.9rem; color:#0f172a; }
+.choice-item { display:flex; gap:.6rem; align-items:center; padding:.55rem .8rem; border:1.5px solid var(--border); border-radius:8px; cursor:pointer; background:#fff; transition:all .12s; font-size:0.9rem; color:var(--text); }
 .choice-item:hover { border-color:#cbd5e1; background:#fafbfc; }
 .choice-item input { cursor:pointer; margin:0; transform:scale(1.1); accent-color:var(--dodo-blue); }
 .choice-item.selected { border-color:var(--dodo-blue); background:rgba(0,119,200,0.06); }
 
-/* Yes/no */
 .yesno-group { display:flex; gap:.75rem; }
-.yesno-option { flex:1; text-align:center; padding:.85rem; border:1.5px solid #e2e8f0; border-radius:10px; cursor:pointer; background:#fff; font-weight:600; font-size:0.92rem; transition:all .12s; }
+.yesno-option { flex:1; text-align:center; padding:.85rem; border:1.5px solid var(--border); border-radius:10px; cursor:pointer; background:#fff; font-weight:600; font-size:0.92rem; transition:all .12s; }
 .yesno-option input { display:none; }
 .yesno-option.selected.yes { border-color:#16a34a; background:rgba(22,163,74,0.08); color:#16a34a; }
 .yesno-option.selected.no { border-color:#dc2626; background:rgba(220,38,38,0.08); color:#dc2626; }
 .yesno-option:hover { border-color:#cbd5e1; }
 
-/* Likert */
 .likert-scale { display:grid; gap:.3rem; margin-top:.5rem; }
 .likert-scale .labels { display:flex; justify-content:space-between; font-size:0.74rem; color:#64748b; font-weight:500; }
 .likert-scale .points { display:flex; gap:.3rem; justify-content:space-between; }
-.likert-point { flex:1; text-align:center; padding:.55rem .3rem; border:1.5px solid #e2e8f0; border-radius:8px; cursor:pointer; background:#fff; font-weight:600; font-size:0.88rem; transition:all .12s; }
+.likert-point { flex:1; text-align:center; padding:.55rem .3rem; border:1.5px solid var(--border); border-radius:8px; cursor:pointer; background:#fff; font-weight:600; font-size:0.88rem; transition:all .12s; }
 .likert-point input { display:none; }
 .likert-point:hover { border-color:#cbd5e1; }
 .likert-point.selected { border-color:var(--dodo-blue); background:var(--dodo-blue); color:#fff; }
 
-/* Star rating */
-.star-rating { display:inline-flex; gap:.15rem; font-size:1.6rem; color:#e2e8f0; user-select:none; }
+.star-rating { display:inline-flex; gap:.15rem; font-size:1.6rem; color:var(--border); user-select:none; }
 .star-rating .star { cursor:pointer; transition:color .12s; }
 .star-rating .star.active, .star-rating:hover .star.hover { color:#f59e0b; }
 
-/* Submit bar */
-.submit-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.25rem 1.5rem; margin-top:1rem; }
+.submit-card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:1.25rem 1.5rem; margin-top:1rem; position:sticky; bottom:0; box-shadow:0 -4px 16px rgba(15,23,42,0.04); }
 .submit-card .progress-text { font-size:0.8rem; color:#64748b; margin-bottom:.75rem; }
-.progress { height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden; margin-bottom:1rem; }
+.progress { height:6px; background:var(--border); border-radius:3px; overflow:hidden; margin-bottom:1rem; }
 .progress-bar { height:100%; background:var(--dodo-blue); transition:width .3s ease; }
-
-.closed-banner { background:#fef3c7; border:1px solid #fcd34d; border-radius:12px; padding:1.25rem; text-align:center; color:#854d0e; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="respond-wrap">
-
-  {% if messages %}
-    {% for msg in messages %}
-      <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show" style="border-radius:10px;font-size:0.85rem;">
-        {{ msg }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-    {% endfor %}
+<!-- Intro card -->
+<div class="intro-card">
+  <span class="type-chip">{{ survey.get_survey_type_display }}</span>
+  <h2>{{ survey.title }}</h2>
+  {% if survey.description %}
+    <div class="desc">{{ survey.description }}</div>
   {% endif %}
-
-  <!-- Intro card -->
-  <div class="intro-card">
-    <span class="type-chip">{{ survey.get_survey_type_display }}</span>
-    <h2>{{ survey.title }}</h2>
-    {% if survey.description %}
-      <div class="desc">{{ survey.description }}</div>
-    {% endif %}
-    {% if survey.instructions %}
-      <div class="instructions">
-        <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--dodo-blue);font-weight:700;margin-bottom:.3rem;">
-          <i class="bi bi-info-circle me-1"></i>Instructions
-        </div>
-        {{ survey.instructions }}
+  {% if survey.instructions %}
+    <div class="instructions">
+      <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--dodo-blue);font-weight:700;margin-bottom:.3rem;">
+        <i class="bi bi-info-circle me-1"></i>Instructions
       </div>
-    {% endif %}
-    <div class="privacy-note">
-      {% if survey.is_anonymous %}
-        <i class="bi bi-shield-lock me-1" style="color:#16a34a;"></i>
-        <strong>Anonymous:</strong> no identifying information will be collected or linked to your answers.
-      {% else %}
-        <i class="bi bi-person me-1" style="color:var(--dodo-blue);"></i>
-        Your name will be recorded with this response.
-      {% endif %}
-      {% if questions %}
-        · <i class="bi bi-list-check me-1"></i>{{ questions|length }} question{{ questions|length|pluralize }}
-      {% endif %}
+      {{ survey.instructions }}
     </div>
-  </div>
-
-  {% if survey.status != 'active' %}
-  <div class="closed-banner">
-    <i class="bi bi-lock-fill d-block mb-2" style="font-size:1.75rem;"></i>
-    <div style="font-weight:600;font-size:1rem;">This survey is not currently accepting responses</div>
-    <div style="font-size:0.85rem;margin-top:.4rem;">Status: <strong>{{ survey.get_status_display }}</strong></div>
-  </div>
-  {% elif not questions %}
-  <div class="closed-banner" style="background:#f1f5f9;border-color:#e2e8f0;color:#64748b;">
-    <i class="bi bi-question-circle d-block mb-2" style="font-size:1.75rem;"></i>
-    <div style="font-weight:600;">No questions have been added to this survey yet.</div>
-  </div>
-  {% else %}
-
-  <form method="post" enctype="multipart/form-data" id="respondForm" novalidate
-        action="{% url 'surveys:respond' survey.pk %}">
-    {% csrf_token %}
-
-    <!-- Name (only if not anonymous) -->
-    {% if not survey.is_anonymous %}
-    <div class="q-block">
-      <div class="q-text">Your Name <span class="req">*</span></div>
-      <input type="text" name="respondent_name" class="form-control" required maxlength="200"
-             placeholder="Full name"
-             {% if user.is_authenticated %}value="{{ user.get_full_name|default:user.email }}"{% endif %}>
-    </div>
-    <div class="q-block">
-      <div class="q-text">Email <span style="color:#94a3b8;font-weight:400;font-size:0.8rem;">(optional)</span></div>
-      <input type="email" name="respondent_email" class="form-control" maxlength="254"
-             placeholder="you@example.com"
-             {% if user.is_authenticated %}value="{{ user.email }}"{% endif %}>
-    </div>
-    {% endif %}
-
-    {% for q in questions %}
-    <div class="q-block {% if q.question_type == 'section_header' %}section-header{% endif %}"
-         data-qtype="{{ q.question_type }}"
-         data-qid="{{ q.pk }}"
-         data-required="{% if q.is_required %}1{% else %}0{% endif %}">
-
-      {% if q.question_type != 'section_header' %}
-        <div class="q-number">{{ forloop.counter }}</div>
-      {% endif %}
-
-      {% if q.question_type == 'section_header' %}
-        <h5>{{ q.text }}</h5>
-        {% if q.description %}<div class="q-desc" style="font-size:0.85rem;">{{ q.description }}</div>{% endif %}
-
-      {% else %}
-        <div class="q-text">
-          {{ q.text }}{% if q.is_required %}<span class="req">*</span>{% endif %}
-        </div>
-        {% if q.description %}<div class="q-desc">{{ q.description }}</div>{% endif %}
-
-        {% if q.question_type == 'text' %}
-          <input type="text" name="q_{{ q.pk }}" class="form-control"
-                 {% if q.is_required %}required{% endif %}
-                 {% if q.max_length %}maxlength="{{ q.max_length }}"{% endif %}
-                 placeholder="Type your answer…">
-
-        {% elif q.question_type == 'textarea' %}
-          <textarea name="q_{{ q.pk }}" class="form-control" rows="4"
-                    {% if q.is_required %}required{% endif %}
-                    {% if q.max_length %}maxlength="{{ q.max_length }}"{% endif %}
-                    placeholder="Type your answer…"></textarea>
-
-        {% elif q.question_type == 'number' %}
-          <input type="number" name="q_{{ q.pk }}" class="form-control" step="any"
-                 {% if q.is_required %}required{% endif %}
-                 {% if q.min_value is not None %}min="{{ q.min_value }}"{% endif %}
-                 {% if q.max_value is not None %}max="{{ q.max_value }}"{% endif %}
-                 placeholder="0"
-                 style="max-width:240px;">
-
-        {% elif q.question_type == 'date' %}
-          <input type="date" name="q_{{ q.pk }}" class="form-control"
-                 {% if q.is_required %}required{% endif %}
-                 style="max-width:240px;">
-
-        {% elif q.question_type == 'radio' %}
-          <div class="choice-list">
-            {% for c in q.choices.all %}
-              <label class="choice-item">
-                <input type="radio" name="q_{{ q.pk }}" value="{{ c.pk }}"
-                       {% if q.is_required %}required{% endif %}>
-                <span>{{ c.text }}</span>
-              </label>
-            {% endfor %}
-          </div>
-
-        {% elif q.question_type == 'checkbox' %}
-          <div class="choice-list">
-            {% for c in q.choices.all %}
-              <label class="choice-item">
-                <input type="checkbox" name="q_{{ q.pk }}" value="{{ c.pk }}">
-                <span>{{ c.text }}</span>
-              </label>
-            {% endfor %}
-          </div>
-
-        {% elif q.question_type == 'dropdown' %}
-          <select name="q_{{ q.pk }}" class="form-select"
-                  {% if q.is_required %}required{% endif %}
-                  style="max-width:420px;">
-            <option value="">— Select one —</option>
-            {% for c in q.choices.all %}
-              <option value="{{ c.pk }}">{{ c.text }}</option>
-            {% endfor %}
-          </select>
-
-        {% elif q.question_type == 'yes_no' %}
-          <div class="yesno-group">
-            {% with yes_choice=q.choices.all.0 no_choice=q.choices.all.1 %}
-              {% if yes_choice and no_choice %}
-                <label class="yesno-option yes">
-                  <input type="radio" name="q_{{ q.pk }}" value="{{ yes_choice.pk }}"
-                         {% if q.is_required %}required{% endif %}>
-                  <i class="bi bi-check-circle me-1"></i>{{ yes_choice.text|default:"Yes" }}
-                </label>
-                <label class="yesno-option no">
-                  <input type="radio" name="q_{{ q.pk }}" value="{{ no_choice.pk }}">
-                  <i class="bi bi-x-circle me-1"></i>{{ no_choice.text|default:"No" }}
-                </label>
-              {% else %}
-                <div class="text-muted" style="font-size:0.8rem;">
-                  <i class="bi bi-exclamation-triangle me-1"></i>
-                  Yes/No options haven't been configured for this question.
-                </div>
-              {% endif %}
-            {% endwith %}
-          </div>
-
-        {% elif q.question_type == 'likert' %}
-          <div class="likert-scale">
-            {% if q.scale_min_label or q.scale_max_label %}
-              <div class="labels">
-                <span>{{ q.scale_min_label|default:q.scale_min }}</span>
-                <span>{{ q.scale_max_label|default:q.scale_max }}</span>
-              </div>
-            {% endif %}
-            <div class="points">
-              {% for n in likert_range %}
-                {% if n >= q.scale_min and n <= q.scale_max %}
-                <label class="likert-point">
-                  <input type="radio" name="q_{{ q.pk }}" value="{{ n }}"
-                         {% if q.is_required %}required{% endif %}>
-                  {{ n }}
-                </label>
-                {% endif %}
-              {% endfor %}
-            </div>
-          </div>
-
-        {% elif q.question_type == 'rating' %}
-          <div class="star-rating" data-max="{{ q.scale_max }}">
-            {% for n in likert_range %}
-              {% if n >= 1 and n <= q.scale_max %}
-                <span class="star" data-value="{{ n }}"><i class="bi bi-star-fill"></i></span>
-              {% endif %}
-            {% endfor %}
-            <input type="hidden" name="q_{{ q.pk }}" value="" {% if q.is_required %}required{% endif %}>
-          </div>
-          <div style="font-size:0.74rem;color:#94a3b8;margin-top:.35rem;">
-            Tap a star to rate ({{ q.scale_min }}–{{ q.scale_max }})
-          </div>
-
-        {% elif q.question_type == 'file' %}
-          <input type="file" name="q_{{ q.pk }}" class="form-control"
-                 {% if q.is_required %}required{% endif %}>
-          <div style="font-size:0.74rem;color:#94a3b8;margin-top:.35rem;">
-            <i class="bi bi-info-circle me-1"></i>Upload a document, image, or PDF.
-          </div>
-
-        {% elif q.question_type == 'geo' %}
-          <div class="geo-widget" data-geo-widget="{{ q.pk }}">
-            <div class="geo-toolbar">
-              <button type="button" class="btn btn-locate" data-action="gps">
-                <i class="bi bi-geo-alt-fill"></i><span>Use GPS</span>
-              </button>
-              <button type="button" class="btn btn-ip" data-action="ip">
-                <i class="bi bi-globe2"></i><span>Approximate (IP)</span>
-              </button>
-              <button type="button" class="btn btn-clear" data-action="clear" style="margin-left:auto;">
-                <i class="bi bi-x-circle"></i>Clear
-              </button>
-            </div>
-            <div class="geo-status" data-geo-status></div>
-
-            <div class="geo-coords-row">
-              <input type="text" name="q_{{ q.pk }}_lat" class="form-control" placeholder="Latitude"
-                     pattern="-?\d+(\.\d+)?" data-geo-lat>
-              <input type="text" name="q_{{ q.pk }}_lng" class="form-control" placeholder="Longitude"
-                     pattern="-?\d+(\.\d+)?" data-geo-lng>
-            </div>
-            <input type="text" name="q_{{ q.pk }}" class="form-control mt-2"
-                   placeholder="Place name / address (auto-fills, you can edit)"
-                   data-geo-place>
-
-            <div class="geo-map placeholder" id="geo_map_{{ q.pk }}" data-geo-map></div>
-          </div>
-
-        {% elif q.question_type == 'ranking' %}
-          <div style="font-size:0.78rem;color:#64748b;margin-bottom:.5rem;">Assign a rank from 1 (highest) to {{ q.choices.count }} for each item.</div>
-          {% for c in q.choices.all %}
-            <div class="d-flex gap-2 align-items-center mb-2">
-              <div style="flex-grow:1;font-size:0.88rem;color:#0f172a;">{{ c.text }}</div>
-              <input type="number" name="q_{{ q.pk }}_rank_{{ c.pk }}" class="form-control"
-                     min="1" max="{{ q.choices.count }}" style="width:90px;" placeholder="Rank">
-            </div>
-          {% endfor %}
-
-        {% elif q.question_type == 'matrix' %}
-          <div style="font-size:0.82rem;color:#64748b;padding:.75rem;background:#fafbfc;border-radius:8px;text-align:center;">
-            <i class="bi bi-grid-3x3-gap me-1"></i>Matrix questions require configuration in the builder.
-          </div>
-
-        {% else %}
-          <input type="text" name="q_{{ q.pk }}" class="form-control"
-                 {% if q.is_required %}required{% endif %}>
-        {% endif %}
-
-        <div class="error-msg text-danger" style="font-size:0.76rem;margin-top:.3rem;display:none;">
-          <i class="bi bi-exclamation-circle me-1"></i>This question requires an answer.
-        </div>
-      {% endif %}
-    </div>
-    {% endfor %}
-
-    <div class="submit-card">
-      <div class="progress-text">
-        <i class="bi bi-check2-circle me-1" style="color:#16a34a;"></i>
-        <span id="progressLabel">0 of {{ questions|length }} required questions answered</span>
-      </div>
-      <div class="progress">
-        <div class="progress-bar" id="progressBar" style="width:0%;"></div>
-      </div>
-
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div style="font-size:0.78rem;color:#64748b;">
-          <i class="bi bi-shield-check me-1"></i>
-          By submitting, you confirm your answers are accurate to the best of your knowledge.
-        </div>
-        <button type="submit" class="btn" style="background:var(--dodo-blue);color:#fff;border-radius:8px;padding:.5rem 1.4rem;font-weight:600;">
-          <i class="bi bi-send-check me-1"></i>Submit Response
-        </button>
-      </div>
-    </div>
-  </form>
-
   {% endif %}
+  <div class="privacy-note">
+    {% if survey.is_anonymous %}
+      <i class="bi bi-shield-lock me-1" style="color:#16a34a;"></i>
+      <strong>Anonymous:</strong> no identifying information will be collected or linked to your answers.
+    {% else %}
+      <i class="bi bi-person me-1" style="color:var(--dodo-blue);"></i>
+      Your name will be recorded with this response.
+    {% endif %}
+    {% if questions %}
+      · <i class="bi bi-list-check me-1"></i>{{ questions|length }} question{{ questions|length|pluralize }}
+    {% endif %}
+  </div>
 </div>
+
+{% if not questions %}
+<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:12px;padding:1.5rem;text-align:center;color:#854d0e;">
+  <i class="bi bi-question-circle d-block mb-2" style="font-size:1.75rem;"></i>
+  <div style="font-weight:600;">This survey doesn't have any questions yet.</div>
+  <div style="font-size:.85rem;margin-top:.4rem;">Please contact the survey owner.</div>
+</div>
+{% else %}
+
+<form method="post" enctype="multipart/form-data" id="respondForm" novalidate
+      action="{% url 'surveys:respond' survey.pk %}">
+  {% csrf_token %}
+
+  {% if not survey.is_anonymous %}
+  <div class="q-block">
+    <div class="q-text">Your Name <span class="req">*</span></div>
+    <input type="text" name="respondent_name" class="form-control" required maxlength="200"
+           placeholder="Full name"
+           {% if user.is_authenticated %}value="{{ user.get_full_name|default:user.email }}"{% endif %}>
+  </div>
+  <div class="q-block">
+    <div class="q-text">Email <span style="color:#94a3b8;font-weight:400;font-size:0.8rem;">(optional)</span></div>
+    <input type="email" name="respondent_email" class="form-control" maxlength="254"
+           placeholder="you@example.com"
+           {% if user.is_authenticated %}value="{{ user.email }}"{% endif %}>
+  </div>
+  {% endif %}
+
+  {% for q in questions %}
+  <div class="q-block {% if q.question_type == 'section_header' %}section-header{% endif %}"
+       data-qtype="{{ q.question_type }}"
+       data-qid="{{ q.pk }}"
+       data-required="{% if q.is_required %}1{% else %}0{% endif %}">
+
+    {% if q.question_type != 'section_header' %}
+      <div class="q-number">{{ forloop.counter }}</div>
+    {% endif %}
+
+    {% if q.question_type == 'section_header' %}
+      <h5>{{ q.text }}</h5>
+      {% if q.description %}<div class="q-desc" style="font-size:0.85rem;">{{ q.description }}</div>{% endif %}
+
+    {% else %}
+      <div class="q-text">{{ q.text }}{% if q.is_required %}<span class="req">*</span>{% endif %}</div>
+      {% if q.description %}<div class="q-desc">{{ q.description }}</div>{% endif %}
+
+      {% if q.question_type == 'text' %}
+        <input type="text" name="q_{{ q.pk }}" class="form-control"
+               {% if q.is_required %}required{% endif %}
+               {% if q.max_length %}maxlength="{{ q.max_length }}"{% endif %}>
+
+      {% elif q.question_type == 'textarea' %}
+        <textarea name="q_{{ q.pk }}" class="form-control"
+                  {% if q.is_required %}required{% endif %}></textarea>
+
+      {% elif q.question_type == 'number' %}
+        <input type="number" name="q_{{ q.pk }}" class="form-control" step="any"
+               {% if q.min_value is not None %}min="{{ q.min_value }}"{% endif %}
+               {% if q.max_value is not None %}max="{{ q.max_value }}"{% endif %}
+               {% if q.is_required %}required{% endif %}>
+
+      {% elif q.question_type == 'date' %}
+        <input type="date" name="q_{{ q.pk }}" class="form-control"
+               {% if q.is_required %}required{% endif %}>
+
+      {% elif q.question_type == 'radio' %}
+        <div class="choice-list">
+          {% for c in q.choices.all %}
+          <label class="choice-item">
+            <input type="radio" name="q_{{ q.pk }}" value="{{ c.pk }}"
+                   {% if q.is_required %}required{% endif %}>
+            <span>{{ c.text }}</span>
+          </label>
+          {% endfor %}
+        </div>
+
+      {% elif q.question_type == 'checkbox' %}
+        <div class="choice-list">
+          {% for c in q.choices.all %}
+          <label class="choice-item">
+            <input type="checkbox" name="q_{{ q.pk }}" value="{{ c.pk }}">
+            <span>{{ c.text }}</span>
+          </label>
+          {% endfor %}
+        </div>
+
+      {% elif q.question_type == 'dropdown' %}
+        <select name="q_{{ q.pk }}" class="form-select"
+                {% if q.is_required %}required{% endif %}>
+          <option value="">— Select —</option>
+          {% for c in q.choices.all %}
+          <option value="{{ c.pk }}">{{ c.text }}</option>
+          {% endfor %}
+        </select>
+
+      {% elif q.question_type == 'yes_no' %}
+        <div class="yesno-group">
+          {% for c in q.choices.all %}
+          <label class="yesno-option {% if c.value == 'yes' %}yes{% else %}no{% endif %}">
+            <input type="radio" name="q_{{ q.pk }}" value="{{ c.pk }}"
+                   {% if q.is_required %}required{% endif %}>
+            <i class="bi bi-{% if c.value == 'yes' %}check-lg{% else %}x-lg{% endif %} me-1"></i>{{ c.text }}
+          </label>
+          {% endfor %}
+        </div>
+
+      {% elif q.question_type == 'likert' %}
+        <div class="likert-scale">
+          {% if q.scale_min_label or q.scale_max_label %}
+          <div class="labels">
+            <span>{{ q.scale_min_label }}</span>
+            <span>{{ q.scale_max_label }}</span>
+          </div>
+          {% endif %}
+          <div class="points">
+            {% for n in likert_range %}
+              {% if n >= q.scale_min and n <= q.scale_max %}
+              <label class="likert-point">
+                <input type="radio" name="q_{{ q.pk }}" value="{{ n }}"
+                       {% if q.is_required %}required{% endif %}>
+                <span>{{ n }}</span>
+              </label>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+
+      {% elif q.question_type == 'rating' %}
+        <div class="star-rating" data-max="{{ q.scale_max }}">
+          {% for n in likert_range %}
+            {% if n >= 1 and n <= q.scale_max %}
+              <span class="star" data-value="{{ n }}"><i class="bi bi-star-fill"></i></span>
+            {% endif %}
+          {% endfor %}
+          <input type="hidden" name="q_{{ q.pk }}" value="" {% if q.is_required %}required{% endif %}>
+        </div>
+        <div style="font-size:0.74rem;color:#94a3b8;margin-top:.35rem;">
+          Tap a star to rate ({{ q.scale_min }}–{{ q.scale_max }})
+        </div>
+
+      {% elif q.question_type == 'file' %}
+        <input type="file" name="q_{{ q.pk }}" class="form-control"
+               {% if q.is_required %}required{% endif %}>
+        <div style="font-size:0.74rem;color:#94a3b8;margin-top:.35rem;">
+          <i class="bi bi-info-circle me-1"></i>Upload a document, image, or PDF.
+        </div>
+
+      {% elif q.question_type == 'geo' %}
+        <div class="geo-widget" data-geo-widget="{{ q.pk }}">
+          <div class="geo-toolbar">
+            <button type="button" class="btn btn-locate" data-action="gps">
+              <i class="bi bi-geo-alt-fill"></i><span>Use GPS</span>
+            </button>
+            <button type="button" class="btn btn-ip" data-action="ip">
+              <i class="bi bi-globe2"></i><span>Approximate (IP)</span>
+            </button>
+            <button type="button" class="btn btn-clear" data-action="clear" style="margin-left:auto;">
+              <i class="bi bi-x-circle"></i>Clear
+            </button>
+          </div>
+          <div class="geo-status" data-geo-status></div>
+          <div class="geo-coords-row">
+            <input type="text" name="q_{{ q.pk }}_lat" class="form-control" placeholder="Latitude"
+                   pattern="-?\d+(\.\d+)?" data-geo-lat>
+            <input type="text" name="q_{{ q.pk }}_lng" class="form-control" placeholder="Longitude"
+                   pattern="-?\d+(\.\d+)?" data-geo-lng>
+          </div>
+          <input type="text" name="q_{{ q.pk }}" class="form-control mt-2"
+                 placeholder="Place name / address (auto-fills, you can edit)"
+                 data-geo-place>
+          <div class="geo-map placeholder" id="geo_map_{{ q.pk }}" data-geo-map></div>
+        </div>
+
+      {% elif q.question_type == 'ranking' %}
+        <div style="font-size:0.78rem;color:#64748b;margin-bottom:.5rem;">
+          Assign a rank from 1 (highest) to {{ q.choices.count }} for each item.
+        </div>
+        {% for c in q.choices.all %}
+          <div class="d-flex gap-2 align-items-center mb-2">
+            <div style="flex-grow:1;font-size:0.88rem;color:var(--text);">{{ c.text }}</div>
+            <input type="number" name="q_{{ q.pk }}_rank_{{ c.pk }}" class="form-control"
+                   min="1" max="{{ q.choices.count }}" style="width:90px;" placeholder="Rank">
+          </div>
+        {% endfor %}
+
+      {% else %}
+        <input type="text" name="q_{{ q.pk }}" class="form-control"
+               {% if q.is_required %}required{% endif %}>
+      {% endif %}
+
+      <div class="error-msg text-danger" style="font-size:0.76rem;margin-top:.3rem;display:none;">
+        <i class="bi bi-exclamation-circle me-1"></i>This question requires an answer.
+      </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <div class="submit-card">
+    <div class="progress-text">
+      <i class="bi bi-check2-circle me-1" style="color:#16a34a;"></i>
+      <span id="progressLabel">0 of {{ required_count }} required questions answered</span>
+    </div>
+    <div class="progress">
+      <div class="progress-bar" id="progressBar" style="width:0%;"></div>
+    </div>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div style="font-size:0.78rem;color:#64748b;">
+        <i class="bi bi-shield-check me-1"></i>
+        By submitting, you confirm your answers are accurate to the best of your knowledge.
+      </div>
+      <button type="submit" class="btn" style="background:var(--dodo-blue);color:#fff;border-radius:8px;padding:.5rem 1.4rem;font-weight:600;">
+        <i class="bi bi-send-check me-1"></i>Submit Response
+      </button>
+    </div>
+  </div>
+</form>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
-// ---------- Geo question widgets ----------
-function initGeoWidgets() {
-  if (typeof L === 'undefined') return;  // Leaflet failed to load
-  document.querySelectorAll('[data-geo-widget]').forEach(setupGeoWidget);
-}
-
-function setupGeoWidget(wrapper) {
+// ----- Geo widget (Leaflet + Nominatim) -----
+function initGeoWidget(wrapper) {
+  const qid = wrapper.dataset.geoWidget;
   const latInput = wrapper.querySelector('[data-geo-lat]');
   const lngInput = wrapper.querySelector('[data-geo-lng]');
   const placeInput = wrapper.querySelector('[data-geo-place]');
   const statusEl = wrapper.querySelector('[data-geo-status]');
   const mapEl = wrapper.querySelector('[data-geo-map]');
-  let map = null;
-  let marker = null;
+  let map = null, marker = null;
 
   function setStatus(text, level = '') {
     statusEl.textContent = text;
     statusEl.className = 'geo-status' + (level ? ' ' + level : '');
   }
-
   function ensureMap() {
     if (map) return map;
     mapEl.classList.remove('placeholder');
-    map = L.map(mapEl, { zoomControl: true, attributionControl: true });
+    map = L.map(mapEl, { zoomControl: true });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap',
-      maxZoom: 19,
+      attribution: '© OpenStreetMap', maxZoom: 19,
     }).addTo(map);
     return map;
   }
-
   function updateMap(lat, lng, zoom = 15) {
     const m = ensureMap();
-    const latLng = [lat, lng];
+    const ll = [lat, lng];
     if (!marker) {
-      marker = L.marker(latLng, { draggable: true }).addTo(m);
+      marker = L.marker(ll, { draggable: true }).addTo(m);
       marker.on('dragend', () => {
-        const ll = marker.getLatLng();
-        latInput.value = ll.lat.toFixed(6);
-        lngInput.value = ll.lng.toFixed(6);
+        const p = marker.getLatLng();
+        latInput.value = p.lat.toFixed(6);
+        lngInput.value = p.lng.toFixed(6);
         setStatus('Pin moved — coordinates updated.', 'ok');
-        reverseGeocode(ll.lat, ll.lng);
+        reverseGeocode(p.lat, p.lng);
       });
-    } else {
-      marker.setLatLng(latLng);
-    }
-    m.setView(latLng, zoom);
-    // Map needs a size invalidation when it was hidden / freshly shown
+    } else marker.setLatLng(ll);
+    m.setView(ll, zoom);
     setTimeout(() => m.invalidateSize(), 50);
   }
-
   function reverseGeocode(lat, lng) {
-    if (placeInput.dataset.userEdited === '1') return;  // Don't overwrite user typing
-    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`, {
-      headers: { 'Accept': 'application/json' },
-    })
+    if (placeInput.dataset.userEdited === '1') return;
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`,
+          { headers: { 'Accept': 'application/json' } })
       .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data && data.display_name && placeInput.dataset.userEdited !== '1') {
-          placeInput.value = data.display_name;
+      .then(d => {
+        if (d && d.display_name && placeInput.dataset.userEdited !== '1') {
+          placeInput.value = d.display_name;
         }
-      })
-      .catch(() => {/* silent */});
+      }).catch(() => {});
   }
 
-  // GPS button
   wrapper.querySelector('[data-action="gps"]').addEventListener('click', function() {
-    const btn = this;
-    if (!navigator.geolocation) {
-      setStatus('Your browser doesn\'t support GPS. Try the IP option.', 'err');
-      return;
-    }
-    btn.disabled = true;
-    const orig = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner"></span><span>Locating…</span>';
-    setStatus('Requesting GPS — please allow location access if prompted.');
-
+    if (!navigator.geolocation) return setStatus("Browser doesn't support GPS — try IP.", 'err');
+    this.disabled = true;
+    setStatus('Locating…');
     navigator.geolocation.getCurrentPosition(
       pos => {
-        btn.disabled = false; btn.innerHTML = orig;
-        const { latitude, longitude, accuracy } = pos.coords;
-        latInput.value = latitude.toFixed(6);
-        lngInput.value = longitude.toFixed(6);
-        updateMap(latitude, longitude, 16);
-        const accStr = accuracy < 1000
-          ? `±${Math.round(accuracy)} m`
-          : `±${(accuracy / 1000).toFixed(1)} km`;
-        setStatus(`Location set via GPS (${accStr}). Drag the pin to fine-tune.`, 'ok');
-        reverseGeocode(latitude, longitude);
+        this.disabled = false;
+        const { latitude: lat, longitude: lng } = pos.coords;
+        latInput.value = lat.toFixed(6);
+        lngInput.value = lng.toFixed(6);
+        setStatus(`Location captured (±${Math.round(pos.coords.accuracy)} m)`, 'ok');
+        updateMap(lat, lng);
+        reverseGeocode(lat, lng);
       },
-      err => {
-        btn.disabled = false; btn.innerHTML = orig;
-        const messages = {
-          1: 'Permission denied — enable location access in your browser settings.',
-          2: 'GPS unavailable on this device. Try the IP option.',
-          3: 'GPS request timed out. Try again or use IP.',
-        };
-        setStatus(messages[err.code] || ('GPS error: ' + err.message), 'err');
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      err => { this.disabled = false; setStatus(`GPS failed: ${err.message}`, 'err'); },
+      { enableHighAccuracy: true, timeout: 10000 }
     );
   });
 
-  // IP button
   wrapper.querySelector('[data-action="ip"]').addEventListener('click', function() {
-    const btn = this;
-    btn.disabled = true;
-    const orig = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner"></span><span>Locating…</span>';
-    setStatus('Looking up location from IP address…');
-
+    this.disabled = true;
+    setStatus('Looking up by IP…');
     fetch('https://ipapi.co/json/')
-      .then(r => r.ok ? r.json() : Promise.reject('lookup failed'))
-      .then(data => {
-        btn.disabled = false; btn.innerHTML = orig;
-        if (data && data.latitude && data.longitude) {
-          latInput.value = Number(data.latitude).toFixed(6);
-          lngInput.value = Number(data.longitude).toFixed(6);
-          updateMap(data.latitude, data.longitude, 11);
-          const cityCountry = [data.city, data.country_name].filter(Boolean).join(', ');
-          if (cityCountry && placeInput.dataset.userEdited !== '1') {
-            placeInput.value = cityCountry;
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => {
+        this.disabled = false;
+        if (d && d.latitude && d.longitude) {
+          latInput.value = (+d.latitude).toFixed(6);
+          lngInput.value = (+d.longitude).toFixed(6);
+          if (d.city || d.country_name) {
+            placeInput.value = [d.city, d.country_name].filter(Boolean).join(', ');
           }
-          setStatus('Approximate location set from IP — accurate to city level. Drag pin or use GPS for precision.', 'ok');
-        } else {
-          setStatus('Could not determine location from IP.', 'err');
-        }
+          setStatus('Approximate location set from IP.', 'ok');
+          updateMap(+d.latitude, +d.longitude, 11);
+        } else setStatus('Could not look up your IP.', 'err');
       })
-      .catch(() => {
-        btn.disabled = false; btn.innerHTML = orig;
-        setStatus('IP lookup failed — try GPS or enter coordinates manually.', 'err');
-      });
+      .catch(() => { this.disabled = false; setStatus('IP lookup failed.', 'err'); });
   });
 
-  // Clear button
-  wrapper.querySelector('[data-action="clear"]').addEventListener('click', function() {
-    latInput.value = '';
-    lngInput.value = '';
-    placeInput.value = '';
+  wrapper.querySelector('[data-action="clear"]').addEventListener('click', () => {
+    latInput.value = ''; lngInput.value = ''; placeInput.value = '';
     placeInput.dataset.userEdited = '';
     if (marker) { marker.remove(); marker = null; }
     if (map) { map.remove(); map = null; }
-    mapEl.classList.add('placeholder');
-    mapEl.innerHTML = '';
+    mapEl.classList.add('placeholder'); mapEl.innerHTML = '';
     setStatus('');
   });
 
-  // Manual lat/lng entry → update map
   function syncFromInputs() {
-    const lat = parseFloat(latInput.value);
-    const lng = parseFloat(lngInput.value);
+    const lat = parseFloat(latInput.value), lng = parseFloat(lngInput.value);
     if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
       updateMap(lat, lng, 13);
     }
@@ -568,45 +458,37 @@ function setupGeoWidget(wrapper) {
       manualTimer = setTimeout(syncFromInputs, 600);
     });
   });
-
-  // Track whether user has manually edited the place field (so reverse geocode won't clobber)
   placeInput.addEventListener('input', () => {
     placeInput.dataset.userEdited = placeInput.value.trim() ? '1' : '';
   });
-
-  // If the form was loaded with pre-existing coords (rare but possible), show map immediately
-  if (latInput.value && lngInput.value) {
-    syncFromInputs();
-  }
+  if (latInput.value && lngInput.value) syncFromInputs();
 }
 
-document.addEventListener('DOMContentLoaded', initGeoWidgets);
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[data-geo-widget]').forEach(initGeoWidget);
+});
 
-// ---------- Existing respond.html JS continues below ----------
-// Highlight selected choice items
+// Choice highlight
 document.querySelectorAll('.choice-item').forEach(label => {
   const input = label.querySelector('input');
   if (!input) return;
-  function sync() {
+  input.addEventListener('change', () => {
     if (input.type === 'radio') {
-      // Uncheck siblings visually
       document.querySelectorAll(`input[name="${input.name}"]`).forEach(i => {
         i.closest('.choice-item')?.classList.toggle('selected', i.checked);
       });
     } else {
       label.classList.toggle('selected', input.checked);
     }
-  }
-  input.addEventListener('change', sync);
+  });
 });
 
-// Yes/No pill selection
+// Yes/No
 document.querySelectorAll('.yesno-option').forEach(label => {
   label.addEventListener('click', function() {
     const input = this.querySelector('input');
     if (!input) return;
-    const name = input.name;
-    document.querySelectorAll(`input[name="${name}"]`).forEach(i => {
+    document.querySelectorAll(`input[name="${input.name}"]`).forEach(i => {
       i.closest('.yesno-option')?.classList.remove('selected');
     });
     this.classList.add('selected');
@@ -614,13 +496,12 @@ document.querySelectorAll('.yesno-option').forEach(label => {
   });
 });
 
-// Likert points
+// Likert
 document.querySelectorAll('.likert-point').forEach(label => {
   label.addEventListener('click', function() {
     const input = this.querySelector('input');
     if (!input) return;
-    const name = input.name;
-    document.querySelectorAll(`input[name="${name}"]`).forEach(i => {
+    document.querySelectorAll(`input[name="${input.name}"]`).forEach(i => {
       i.closest('.likert-point')?.classList.remove('selected');
     });
     this.classList.add('selected');
@@ -633,7 +514,6 @@ document.querySelectorAll('.star-rating').forEach(wrap => {
   const stars = wrap.querySelectorAll('.star');
   const hidden = wrap.querySelector('input[type=hidden]');
   let current = 0;
-
   stars.forEach((star, idx) => {
     star.addEventListener('mouseover', () => {
       stars.forEach((s, i) => s.classList.toggle('hover', i <= idx));
@@ -649,7 +529,7 @@ document.querySelectorAll('.star-rating').forEach(wrap => {
   });
 });
 
-// Progress tracker (required questions)
+// Progress (only counts required)
 function updateProgress() {
   const blocks = document.querySelectorAll('.q-block[data-required="1"]');
   let answered = 0;
@@ -659,9 +539,7 @@ function updateProgress() {
     inputs.forEach(i => {
       if (i.type === 'checkbox' || i.type === 'radio') {
         if (i.checked) has = true;
-      } else if (i.type !== 'hidden' || i.value) {
-        if (i.value && i.value.trim() !== '') has = true;
-      }
+      } else if (i.value && i.value.trim() !== '') has = true;
     });
     if (has) answered++;
   });
@@ -672,23 +550,20 @@ function updateProgress() {
   if (bar) bar.style.width = pct + '%';
   if (lbl) lbl.textContent = `${answered} of ${total} required question${total === 1 ? '' : 's'} answered`;
 }
-
 document.querySelectorAll('#respondForm input, #respondForm select, #respondForm textarea').forEach(el => {
   el.addEventListener('change', updateProgress);
   el.addEventListener('input', updateProgress);
 });
 updateProgress();
 
-// Client-side required validation with inline error messages
+// Required validation
 document.getElementById('respondForm')?.addEventListener('submit', function(e) {
   let firstInvalid = null;
   document.querySelectorAll('.q-block.has-error').forEach(b => b.classList.remove('has-error'));
   document.querySelectorAll('.error-msg').forEach(m => m.style.display = 'none');
-
   document.querySelectorAll('.q-block[data-required="1"]').forEach(b => {
     const qtype = b.dataset.qtype;
     if (qtype === 'section_header') return;
-
     const inputs = b.querySelectorAll('input, select, textarea');
     let has = false;
     inputs.forEach(i => {
@@ -696,7 +571,6 @@ document.getElementById('respondForm')?.addEventListener('submit', function(e) {
         if (i.checked) has = true;
       } else if (i.value && i.value.trim() !== '') has = true;
     });
-
     if (!has) {
       b.classList.add('has-error');
       const msg = b.querySelector('.error-msg');
@@ -704,7 +578,6 @@ document.getElementById('respondForm')?.addEventListener('submit', function(e) {
       if (!firstInvalid) firstInvalid = b;
     }
   });
-
   if (firstInvalid) {
     e.preventDefault();
     firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
