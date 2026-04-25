@@ -11,7 +11,7 @@
 <style>
 .year-header { font-size:0.85rem; font-weight:700; color:var(--dodo-blue); padding:.6rem .9rem; background:#f0f7ff; border-radius:10px 10px 0 0; border:1px solid #dbeafe; border-bottom:none; display:flex; align-items:center; gap:.5rem; }
 .year-block { margin-bottom:1.5rem; }
-.cycle-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:.75rem; padding:.75rem; background:#fff; border:1px solid #dbeafe; border-top:none; border-radius:0 0 10px 10px; }
+.cycle-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:.75rem; padding:.75rem; background:#fff; border:1px solid #dbeafe; border-top:none; border-radius:0 0 10px 10px; }
 .cycle-card { border:1px solid #e2e8f0; border-radius:10px; padding:.8rem; background:#fafbfc; position:relative; transition:all .12s; }
 .cycle-card:hover { border-color:var(--dodo-blue); background:#fff; }
 .cycle-card.progress { border-left:4px solid var(--dodo-blue); }
@@ -25,6 +25,16 @@
 .deadline-pill { display:inline-flex; align-items:center; gap:.3rem; padding:.18rem .5rem; border-radius:12px; font-size:0.72rem; font-weight:500; background:#fef3c7; color:#854d0e; }
 .deadline-pill.past { background:#f1f5f9; color:#64748b; }
 .deadline-pill.soon { background:#fee2e2; color:#991b1b; }
+
+.card-actions { position:absolute; top:.5rem; right:.5rem; display:none; gap:.25rem; }
+.cycle-card:hover .card-actions { display:flex; }
+.icon-btn { background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:.15rem .35rem; font-size:0.78rem; color:#64748b; cursor:pointer; line-height:1; }
+.icon-btn:hover { background:var(--dodo-blue); color:#fff; border-color:var(--dodo-blue); }
+.icon-btn.danger:hover { background:#dc2626; border-color:#dc2626; }
+
+.modal-content { border-radius:12px; border:none; }
+.modal-header { background:#f8fafc; border-bottom:1px solid #e2e8f0; border-radius:12px 12px 0 0; }
+.modal-title { font-weight:700; font-size:1rem; color:#0f172a; }
 </style>
 {% endblock %}
 
@@ -38,6 +48,12 @@
     <a href="{% url 'projects:tracker' %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
       <i class="bi bi-table me-1"></i>Open Tracker
     </a>
+    {% if can_manage %}
+    <button type="button" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;font-size:0.82rem;"
+            data-bs-toggle="modal" data-bs-target="#cycleModal" onclick="openCycleModalForCreate()">
+      <i class="bi bi-plus-circle me-1"></i>Add Cycle
+    </button>
+    {% endif %}
   </div>
 </div>
 
@@ -51,11 +67,21 @@
     <span style="width:12px;height:12px;background:#8b5cf6;border-radius:3px;"></span>
     Output Verification
   </div>
+  {% if not can_manage %}
   <div class="ms-auto text-muted" style="font-size:0.76rem;">
-    <i class="bi bi-info-circle me-1"></i>
-    Cycles are configured by admins — contact your M&E focal point to add new ones.
+    <i class="bi bi-info-circle me-1"></i>Only country-office admins can add or edit cycles.
   </div>
+  {% endif %}
 </div>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert" style="font-size:0.85rem;">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
 
 {% regroup cycles by year as cycles_by_year %}
 
@@ -71,7 +97,24 @@
   <div class="cycle-grid">
     {% for c in year_group.list %}
     <div class="cycle-card {{ c.cycle_type }}">
-      <div class="d-flex justify-content-between align-items-start mb-2">
+      {% if can_manage %}
+      <div class="card-actions">
+        <button class="icon-btn" title="Edit"
+                data-bs-toggle="modal" data-bs-target="#cycleModal"
+                onclick="openCycleModalForEdit({{ c.pk }})">
+          <i class="bi bi-pencil"></i>
+        </button>
+        <form method="post" action="{% url 'projects:cycle_delete' c.pk %}" class="d-inline"
+              onsubmit="return confirm('Delete the {{ c.year }} {{ c.quarter }} {{ c.get_cycle_type_display }} cycle? This will also remove all status entries linked to it.');">
+          {% csrf_token %}
+          <button type="submit" class="icon-btn danger" title="Delete">
+            <i class="bi bi-trash"></i>
+          </button>
+        </form>
+      </div>
+      {% endif %}
+
+      <div class="d-flex justify-content-between align-items-start mb-2" style="padding-right:{% if can_manage %}3.5rem{% else %}0{% endif %};">
         <div class="cycle-quarter">{{ c.quarter }}</div>
         <span class="cycle-type-label {{ c.cycle_type }}">{{ c.get_cycle_type_display }}</span>
       </div>
@@ -112,7 +155,7 @@
       </div>
       {% endif %}
 
-      <div class="mt-2 pt-2 border-top" style="border-color:#e2e8f0;">
+      <div class="mt-2 pt-2 border-top">
         <a href="{% url 'projects:tracker' %}?year={{ c.year }}&type={{ c.cycle_type }}"
            style="font-size:0.74rem;color:var(--dodo-blue);text-decoration:none;font-weight:500;">
           <i class="bi bi-box-arrow-up-right me-1"></i>View in tracker
@@ -128,12 +171,130 @@
     <i class="bi bi-calendar-x" style="font-size:2.5rem;color:#cbd5e1;"></i>
     <h6 class="mt-2" style="font-weight:600;color:#1e293b;">No reporting cycles configured</h6>
     <p class="text-muted" style="font-size:0.85rem;max-width:400px;margin:0.5rem auto 1rem;">
-      Reporting cycles define the quarterly windows during which projects must submit progress reports and output verifications. Ask your country office administrator to set them up.
+      Reporting cycles define the quarterly windows during which projects must submit progress reports and output verifications.
     </p>
-    <a href="/admin/projects/reportingcycle/" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">
-      <i class="bi bi-gear me-1"></i>Open Admin
-    </a>
+    {% if can_manage %}
+    <button type="button" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;border-radius:8px;"
+            data-bs-toggle="modal" data-bs-target="#cycleModal" onclick="openCycleModalForCreate()">
+      <i class="bi bi-plus-circle me-1"></i>Add the first cycle
+    </button>
+    {% else %}
+    <p class="text-muted" style="font-size:0.78rem;">Ask a country-office admin to set them up.</p>
+    {% endif %}
   </div>
 </div>
 {% endfor %}
+
+{% if can_manage %}
+<!-- Cycle modal (create + edit) -->
+<div class="modal fade" id="cycleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <form id="cycleForm" method="post" class="modal-content">
+      {% csrf_token %}
+      <div class="modal-header">
+        <h5 class="modal-title" id="cycleModalTitle"><i class="bi bi-calendar3 me-2"></i>Add Reporting Cycle</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label" style="font-size:0.82rem;font-weight:600;">Year *</label>
+            {{ form.year }}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" style="font-size:0.82rem;font-weight:600;">Quarter *</label>
+            {{ form.quarter }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" style="font-size:0.82rem;font-weight:600;">Cycle Type *</label>
+            {{ form.cycle_type }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" style="font-size:0.82rem;font-weight:600;">Reporting Timeline</label>
+            {{ form.reporting_timeline }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" style="font-size:0.82rem;font-weight:600;">Submission Deadline</label>
+            {{ form.submission_deadline }}
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" style="font-size:0.82rem;font-weight:600;">Programme Review</label>
+            {{ form.programme_review_dates }}
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" style="font-size:0.82rem;font-weight:600;">PMSU Review</label>
+            {{ form.pmsu_review_dates }}
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" style="font-size:0.82rem;font-weight:600;">Final Clearance</label>
+            {{ form.final_clearance_dates }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" style="font-size:0.82rem;font-weight:600;">Final Report Due</label>
+            {{ form.final_report_due }}
+          </div>
+        </div>
+        <div class="alert alert-info mt-3" style="font-size:0.78rem;">
+          <i class="bi bi-info-circle me-1"></i>
+          A cycle is unique by year + quarter + type. Adding a duplicate will fail.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-sm" style="background:var(--dodo-blue);color:#fff;">
+          <i class="bi bi-check2 me-1"></i><span id="cycleSubmitLabel">Create cycle</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if can_manage %}
+<script>
+const cycleForm = document.getElementById('cycleForm');
+const cycleModalTitle = document.getElementById('cycleModalTitle');
+const cycleSubmitLabel = document.getElementById('cycleSubmitLabel');
+const createUrl = "{% url 'projects:cycle_create' %}";
+
+function setCycleField(name, value) {
+  const el = cycleForm.querySelector(`[name="${name}"]`);
+  if (el) el.value = value ?? '';
+}
+
+function openCycleModalForCreate() {
+  cycleForm.reset();
+  cycleForm.action = createUrl;
+  cycleModalTitle.innerHTML = '<i class="bi bi-calendar3 me-2"></i>Add Reporting Cycle';
+  cycleSubmitLabel.textContent = 'Create cycle';
+  // Set sensible default for year
+  setCycleField('year', new Date().getFullYear());
+}
+
+async function openCycleModalForEdit(id) {
+  cycleForm.reset();
+  cycleForm.action = `/projects/reporting-cycles/${id}/edit/`;
+  cycleModalTitle.innerHTML = '<i class="bi bi-pencil-square me-2"></i>Edit Reporting Cycle';
+  cycleSubmitLabel.textContent = 'Save changes';
+  try {
+    const res = await fetch(cycleForm.action, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error('Failed to load');
+    const data = await res.json();
+    setCycleField('year', data.year);
+    setCycleField('quarter', data.quarter);
+    setCycleField('cycle_type', data.cycle_type);
+    setCycleField('reporting_timeline', data.reporting_timeline);
+    setCycleField('submission_deadline', data.submission_deadline);
+    setCycleField('programme_review_dates', data.programme_review_dates);
+    setCycleField('pmsu_review_dates', data.pmsu_review_dates);
+    setCycleField('final_clearance_dates', data.final_clearance_dates);
+    setCycleField('final_report_due', data.final_report_due);
+  } catch (e) {
+    alert('Could not load cycle for editing.');
+  }
+}
+</script>
+{% endif %}
 {% endblock %}
