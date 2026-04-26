@@ -119,12 +119,21 @@ class UserCountryAccess(models.Model):
     granted_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name='granted_access'
     )
+    unit = models.ForeignKey(
+        'projects.ProgrammeUnit',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='member_access',
+        help_text='Leave blank for country-office-level access (e.g. central '
+                    'M&E office, CO admin). Set to a unit to restrict this '
+                    'user to that unit only.',
+    )
     is_active = models.BooleanField(default=True)
     granted_at = models.DateTimeField(auto_now_add=True)
     notes = models.TextField(blank=True)
 
     class Meta:
-        unique_together = ['user', 'country_office', 'role']
+        unique_together = ['user', 'country_office', 'role', 'unit']
 
     def __str__(self):
         return f"{self.user} → {self.country_office} [{self.role.name}]"
@@ -147,3 +156,113 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.action} - {self.timestamp}"
+
+
+class MERoleConfig(models.Model):
+    """
+    Admin-editable mapping of "logical M&E roles" (admin, M&E officer,
+    tracker editor, etc.) to the module:action permissions that grant them.
+
+    Why: previously is_me_officer() was hardcoded to check
+    monitoring:approve. That's fragile — different COs may use different
+    role schemes. This table lets the admin pick which permissions count.
+
+    A user is treated as having the logical role if they have ANY of the
+    triggering permissions in the relevant country office. Country-office
+    scope is applied at query time, not stored here, so a single config row
+    applies system-wide.
+    """
+
+    LOGICAL_ROLE_CHOICES = [
+        ('admin', 'Country-Office Administrator'),
+        ('me_officer', 'M&E Officer'),
+        ('tracker_editor', 'Tracker Editor'),
+        ('comment_author', 'Comment Author'),
+    ]
+
+    logical_role = models.CharField(
+        max_length=30,
+        choices=LOGICAL_ROLE_CHOICES,
+        unique=True,
+        help_text='Internal role name used by permission checks.',
+    )
+    label = models.CharField(
+        max_length=100,
+        help_text='Display label shown in role-management UI.',
+    )
+    description = models.TextField(
+        blank=True,
+        help_text='What this logical role can do, in plain language.',
+    )
+    triggering_permissions = models.JSONField(
+        default=list,
+        help_text=(
+            'List of "module:action" strings. A user with ANY of these '
+            'permissions in a country office is considered to hold this '
+            'logical role within that CO. Example: '
+            '["monitoring:approve", "users:admin"].'
+        ),
+    )
+    co_level_only = models.BooleanField(
+        default=False,
+        help_text=(
+            'If true, the user must have CO-level access (UserCountryAccess '
+            'with unit=NULL) to be granted this logical role. Use for roles '
+            'that should never be unit-scoped, like the central M&E officer '
+            'or the country-office tracker editor.'
+        ),
+    )
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['logical_role']
+        verbose_name = 'M&E role configuration'
+        verbose_name_plural = 'M&E role configurations'
+
+    def __str__(self):
+        return f'{self.label} ({self.logical_role})'
+
+    @classmethod
+    def defaults(cls):
+        """Seed values used by the migration if no config exists yet."""
+        return [
+            {
+                'logical_role': 'admin',
+                'label': 'Country-Office Administrator',
+                'description': (
+                    'Full access to all data, projects, users, and settings '
+                    'within the country office.'
+                ),
+                'triggering_permissions': ['users:admin', 'admin:admin'],
+                'co_level_only': True,
+            },
+            {
+                'logical_role': 'me_officer',
+                'label': 'M&E Officer',
+                'description': (
+                    'Central M&E function. Can approve indicator data, run '
+                    'verifications, and update the tracker for any unit.'
+                ),
+                'triggering_permissions': ['monitoring:approve'],
+                'co_level_only': True,
+            },
+            {
+                'logical_role': 'tracker_editor',
+                'label': 'Tracker Editor',
+                'description': (
+                    'Can update reporting status on the tracker. CO-level '
+                    'editors see the whole CO; unit-attached editors see '
+                    'only their unit.'
+                ),
+                'triggering_permissions': ['reporting:edit', 'monitoring:edit'],
+                'co_level_only': False,
+            },
+            {
+                'logical_role': 'comment_author',
+                'label': 'Comment Author',
+                'description': 'Can post comments on indicator data and verifications.',
+                'triggering_permissions': ['monitoring:view', 'reporting:view'],
+                'co_level_only': False,
+            },
+        ]

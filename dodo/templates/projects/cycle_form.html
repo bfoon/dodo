@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% block title %}{% if mode == 'create' %}New Reporting Cycle{% else %}Edit Reporting Cycle{% endif %} — Dodo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" style="color:var(--dodo-blue);text-decoration:none;">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'projects:cycles' %}" style="color:var(--dodo-blue);text-decoration:none;">Reporting Cycles</a></li>
+<li class="breadcrumb-item active">{% if mode == 'create' %}New{% else %}Edit{% endif %}</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.5rem 1.75rem; max-width:780px; }
+.form-card h2 { font-size:1.1rem; font-weight:600; color:#0f172a; margin:0 0 .25rem; }
+.form-card .sub { font-size:.85rem; color:#64748b; margin:0 0 1.5rem; }
+.field { margin-bottom:1rem; }
+.field label { display:block; font-size:.78rem; font-weight:600; color:#374151; margin-bottom:.3rem; }
+.field input, .field select, .field textarea { width:100%; padding:.5rem .7rem; border:1px solid #e2e8f0; border-radius:7px; font-size:.88rem; }
+.field input:focus, .field select:focus, .field textarea:focus { outline:none; border-color:var(--dodo-blue); box-shadow:0 0 0 3px rgba(0,119,200,.12); }
+.field .help { font-size:.74rem; color:#94a3b8; margin-top:.2rem; }
+
+.row-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:.85rem; }
+.prefill-banner { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:.6rem .85rem; font-size:.82rem; color:#1e40af; margin-bottom:1.25rem; display:flex; align-items:center; gap:.5rem; }
+.match-banner { background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; }
+
+.actions { display:flex; gap:.5rem; justify-content:flex-end; padding-top:1rem; border-top:1px solid #f1f5f9; margin-top:1.25rem; }
+.btn-cancel { padding:.5rem 1rem; border:1px solid #e2e8f0; background:#fff; color:#475569; border-radius:8px; font-size:.85rem; text-decoration:none; }
+.btn-cancel:hover { background:#f8fafc; }
+.btn-submit { padding:.5rem 1.25rem; background:var(--dodo-blue); color:#fff; border:none; border-radius:8px; font-size:.85rem; font-weight:500; cursor:pointer; }
+.btn-submit:hover { background:#005a9e; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title">
+      <i class="bi bi-calendar-plus me-2" style="color:var(--dodo-blue);"></i>
+      {% if mode == 'create' %}New Reporting Cycle{% else %}Edit Reporting Cycle{% endif %}
+    </h1>
+    <p class="page-header-sub">Configure a quarterly reporting window</p>
+  </div>
+</div>
+
+<div class="form-card">
+  {% if initial.is_prefilled %}
+    {% if initial.year == initial.today_year and initial.quarter == initial.today_quarter %}
+      <div class="prefill-banner match-banner">
+        <i class="bi bi-check-circle"></i>
+        <span>Pre-filled to <strong>{{ initial.today_year }} {{ initial.today_quarter }}</strong> — today's current quarter.</span>
+      </div>
+    {% else %}
+      <div class="prefill-banner">
+        <i class="bi bi-info-circle"></i>
+        <span>Pre-filled with <strong>{{ initial.year }} {{ initial.quarter }}</strong>. You can adjust before saving.</span>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="row-grid">
+      <div class="field">
+        <label for="year">Year</label>
+        <select name="year" id="year" required>
+          {% for y in years %}
+            <option value="{{ y }}" {% if y == initial.year %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="quarter">Quarter</label>
+        <select name="quarter" id="quarter" required>
+          {% for q in quarters %}
+            <option value="{{ q }}" {% if q == initial.quarter %}selected{% endif %}>{{ q }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="cycle_type">Cycle type</label>
+        <select name="cycle_type" id="cycle_type" required>
+          <option value="progress" {% if initial.cycle_type == 'progress' %}selected{% endif %}>Progress Reporting</option>
+          <option value="verification" {% if initial.cycle_type == 'verification' %}selected{% endif %}>Output Verification</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="reporting_timeline">Reporting timeline</label>
+      <input type="text" name="reporting_timeline" id="reporting_timeline" placeholder="e.g. Oct–Dec 2026">
+      <div class="help">Free-text label shown on dashboards (the period this cycle covers).</div>
+    </div>
+
+    <div class="row-grid">
+      <div class="field">
+        <label for="submission_deadline">Submission deadline</label>
+        <input type="date" name="submission_deadline" id="submission_deadline">
+        <div class="help">When project teams must submit their reports.</div>
+      </div>
+
+      <div class="field">
+        <label for="final_report_due">Final report due</label>
+        <input type="date" name="final_report_due" id="final_report_due">
+        <div class="help">When the consolidated CO report is due externally.</div>
+      </div>
+    </div>
+
+    <div class="row-grid">
+      <div class="field">
+        <label for="programme_review_dates">Programme review dates</label>
+        <input type="text" name="programme_review_dates" id="programme_review_dates" placeholder="e.g. 5–10 Jan">
+      </div>
+
+      <div class="field">
+        <label for="pmsu_review_dates">PMSU review dates</label>
+        <input type="text" name="pmsu_review_dates" id="pmsu_review_dates" placeholder="e.g. 11–15 Jan">
+      </div>
+
+      <div class="field">
+        <label for="final_clearance_dates">Final clearance dates</label>
+        <input type="text" name="final_clearance_dates" id="final_clearance_dates" placeholder="e.g. 16–20 Jan">
+      </div>
+    </div>
+
+    <div class="actions">
+      <a href="{% url 'projects:cycles' %}" class="btn-cancel">Cancel</a>
+      <button type="submit" class="btn-submit">
+        <i class="bi bi-check-lg me-1"></i>{% if mode == 'create' %}Create cycle{% else %}Save changes{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

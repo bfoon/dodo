@@ -10,36 +10,95 @@
 {% block extra_css %}
 <style>
 .filter-bar { background:#fff; border-radius:12px; border:1px solid #e2e8f0; padding:.75rem 1rem; margin-bottom:1rem; }
-.verification-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; margin-bottom:.75rem; overflow:hidden; }
-.verification-card .header { padding:.9rem 1.1rem; display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; border-bottom:1px solid #f1f5f9; }
-.verification-card .header .project-title { font-weight:600; color:#0f172a; font-size:0.92rem; flex-grow:1; min-width:200px; }
-.verification-card .header .project-title a { color:inherit; text-decoration:none; }
-.verification-card .header .project-title a:hover { color:var(--dodo-blue); }
-.verification-card .body { padding:.75rem 1.1rem; }
 
-.stage-track { display:grid; grid-template-columns:repeat(5, 1fr); gap:.4rem; position:relative; margin:.5rem 0; }
-.stage-track::before { content:''; position:absolute; top:16px; left:10%; right:10%; height:2px; background:#e2e8f0; z-index:0; }
-.stage { position:relative; z-index:1; text-align:center; }
-.stage .dot { width:32px; height:32px; border-radius:50%; background:#fff; border:2px solid #e2e8f0; display:inline-flex; align-items:center; justify-content:center; color:#cbd5e1; font-size:0.85rem; margin-bottom:.2rem; transition:all .2s; }
-.stage.done .dot { background:#16a34a; border-color:#16a34a; color:#fff; }
-.stage.current .dot { background:var(--dodo-blue); border-color:var(--dodo-blue); color:#fff; animation:pulse 2s infinite; }
-.stage .lbl { font-size:0.68rem; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:.02em; }
-.stage .date { font-size:0.72rem; color:#0f172a; margin-top:.1rem; }
-.stage.empty .date { color:#cbd5e1; }
-@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(0,119,200,0.4); } 50% { box-shadow: 0 0 0 6px rgba(0,119,200,0); } }
+.v-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; margin-bottom:.75rem; overflow:visible; transition:border-color .15s; }
+.v-card:hover { border-color:#cbd5e1; }
+.v-card.is-na { opacity:.6; }
+.v-card.is-completed { border-color:#bbf7d0; }
+
+.v-head { padding:.85rem 1.1rem; display:flex; align-items:center; gap:.7rem; flex-wrap:wrap; border-bottom:1px solid #f1f5f9; }
+.v-head .cycle-tag { font-size:.7rem; font-weight:600; padding:.2rem .55rem; border-radius:6px; background:#f1f5f9; color:#475569; letter-spacing:.02em; white-space:nowrap; }
+.v-head .title-block { flex:1; min-width:200px; }
+.v-head .pims { font-size:.68rem; color:#94a3b8; }
+.v-head .title-block a { color:#0f172a; text-decoration:none; font-weight:500; font-size:.9rem; }
+.v-head .title-block a:hover { color:var(--dodo-blue); }
+.v-head .unit-badge { font-size:.65rem; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
+
+.status-pill { font-size:.7rem; font-weight:600; padding:.25rem .65rem; border-radius:999px; white-space:nowrap; }
+.pill-pending             { background:#f1f5f9; color:#475569; }
+.pill-field_verification  { background:#e0e7ff; color:#3730a3; }
+.pill-documentation_review { background:#dbeafe; color:#1e40af; }
+.pill-validation_meeting  { background:#fef3c7; color:#92400e; }
+.pill-completed           { background:#dcfce7; color:#166534; }
+.pill-not_applicable      { background:#f3f4f6; color:#6b7280; }
+
+.edit-btn { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border:1px solid #e2e8f0; border-radius:7px; background:transparent; cursor:pointer; color:#64748b; transition:all .15s; }
+.edit-btn:hover { background:#f8fafc; color:#0f172a; border-color:#cbd5e1; }
+.edit-btn.is-open { background:#eff6ff; color:var(--dodo-blue); border-color:#bfdbfe; }
+
+.v-body { padding:1rem 1.1rem; }
+
+/* Stage track */
+.track { position:relative; display:grid; grid-template-columns:repeat(5, 1fr); gap:.4rem; margin:.4rem 0 .8rem; }
+.track::before { content:''; position:absolute; top:18px; left:10%; right:10%; height:2px; background:#e2e8f0; z-index:0; }
+.track .fill { position:absolute; top:18px; left:10%; height:2px; background:#16a34a; z-index:1; transition:width .3s ease, background-color .3s; }
+
+.stage { position:relative; z-index:2; text-align:center; cursor:default; }
+.stage.clickable { cursor:pointer; }
+.stage.clickable:hover .dot { transform:scale(1.08); }
+
+.stage .dot { width:38px; height:38px; border-radius:50%; margin:0 auto 5px; display:flex; align-items:center; justify-content:center; transition:all .2s; background:#fff; border:2px dashed #cbd5e1; color:#94a3b8; font-size:.95rem; }
+.stage.s-done    .dot { background:#16a34a; border:2px solid #16a34a; color:#fff; }
+.stage.s-current .dot { background:var(--dodo-blue); border:2px solid var(--dodo-blue); color:#fff; box-shadow:0 0 0 5px rgba(0,119,200,.18); }
+.stage.s-current.s-final .dot { background:#16a34a; border-color:#16a34a; box-shadow:0 0 0 5px rgba(22,163,74,.18); }
+.stage.s-na      .dot { background:#fff; border:2px solid #e5e7eb; color:#cbd5e1; opacity:.5; }
+
+.stage .lbl { font-size:.66rem; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
+.stage.s-done .lbl    { color:#166534; }
+.stage.s-current .lbl { color:var(--dodo-blue); font-weight:700; }
+.stage.s-current.s-final .lbl { color:#166534; }
+.stage .date { font-size:.7rem; color:#64748b; margin-top:.1rem; min-height:1em; }
+.stage.s-future .date { color:#cbd5e1; }
+.stage.s-current .date { color:var(--dodo-blue); font-weight:600; }
+
 @media (max-width:640px) {
-  .stage-track { grid-template-columns:repeat(2, 1fr); gap:.5rem; }
-  .stage-track::before { display:none; }
+  .track { grid-template-columns:repeat(2, 1fr); gap:.6rem; }
+  .track::before, .track .fill { display:none; }
 }
 
-.meta-row { display:flex; gap:1.25rem; flex-wrap:wrap; font-size:0.76rem; color:#64748b; margin-top:.4rem; }
-.meta-row .lbl { color:#94a3b8; font-weight:600; text-transform:uppercase; font-size:0.66rem; letter-spacing:.02em; margin-right:.25rem; }
-.notes-box { font-size:0.78rem; color:#475569; background:#fafbfc; border-left:3px solid var(--dodo-blue); padding:.45rem .7rem; border-radius:5px; margin-top:.5rem; }
+/* Edit panel */
+.edit-panel { display:none; padding-top:.85rem; margin-top:.85rem; border-top:1px solid #f1f5f9; }
+.edit-panel.is-open { display:block; }
+.edit-panel .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:.6rem; }
+.edit-panel label { font-size:.68rem; font-weight:600; color:#475569; text-transform:uppercase; letter-spacing:.03em; display:block; margin-bottom:.2rem; }
+.edit-panel input, .edit-panel textarea, .edit-panel select { font-size:.82rem; border-radius:7px; border:1px solid #e2e8f0; padding:.4rem .55rem; width:100%; }
+.edit-panel input:focus, .edit-panel textarea:focus { outline:none; border-color:var(--dodo-blue); box-shadow:0 0 0 3px rgba(0,119,200,.12); }
+.edit-panel textarea { resize:vertical; min-height:60px; }
+.edit-panel .actions { display:flex; gap:.5rem; justify-content:flex-end; margin-top:.7rem; flex-wrap:wrap; }
+.btn-na { font-size:.75rem; padding:.35rem .7rem; border-radius:7px; border:1px solid #e2e8f0; background:#fff; color:#64748b; cursor:pointer; }
+.btn-na:hover { background:#f8fafc; color:#dc2626; border-color:#fecaca; }
+.btn-save { font-size:.78rem; padding:.4rem .85rem; border-radius:7px; border:none; background:var(--dodo-blue); color:#fff; cursor:pointer; font-weight:500; }
+.btn-save:hover { background:#005a9e; }
 
+/* Meta row */
+.meta-row { display:flex; gap:1.1rem; flex-wrap:wrap; font-size:.74rem; color:#64748b; padding-top:.65rem; border-top:1px solid #f1f5f9; margin-top:.4rem; }
+.meta-row.no-border { border-top:none; padding-top:0; }
+.meta-row .lbl { color:#94a3b8; font-weight:600; text-transform:uppercase; font-size:.64rem; letter-spacing:.03em; margin-right:.25rem; }
+.notes-box { font-size:.78rem; color:#475569; background:#fafbfc; border-left:3px solid var(--dodo-blue); padding:.45rem .7rem; border-radius:5px; margin-top:.5rem; }
+
+/* Empty + viewer hint */
 .empty-state { padding:3rem 1rem; text-align:center; color:#64748b; }
-.empty-state i { font-size:2.5rem; color:#cbd5e1; display:block; margin-bottom:.5rem; }
+.empty-state i { font-size:2.4rem; color:#cbd5e1; display:block; margin-bottom:.5rem; }
 
-.legend { display:flex; gap:.5rem; flex-wrap:wrap; font-size:0.72rem; }
+.viewer-hint { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:.55rem .85rem; font-size:.78rem; color:#1e40af; margin-bottom:1rem; display:flex; align-items:center; gap:.5rem; }
+
+/* Toast */
+.toast-stack { position:fixed; top:1rem; right:1rem; z-index:1080; display:flex; flex-direction:column; gap:.4rem; pointer-events:none; }
+.toast-stack .t { background:#0f172a; color:#fff; padding:.55rem .9rem; border-radius:8px; font-size:.82rem; box-shadow:0 4px 12px rgba(0,0,0,.15); animation:slideIn .25s ease; pointer-events:auto; }
+.toast-stack .t.err { background:#991b1b; }
+@keyframes slideIn { from { transform:translateX(20px); opacity:0; } to { transform:translateX(0); opacity:1; } }
+
+.legend { display:flex; gap:.5rem; flex-wrap:wrap; font-size:.72rem; }
 .legend-pill { display:inline-flex; align-items:center; gap:.3rem; padding:.18rem .5rem; border-radius:12px; background:#f1f5f9; color:#475569; font-weight:500; }
 .legend-pill .dot { width:8px; height:8px; border-radius:50%; }
 </style>
@@ -52,7 +111,7 @@
     <p class="page-header-sub">Track field verification, document review, and validation milestones per project cycle</p>
   </div>
   <div class="d-flex gap-2">
-    <a href="{% url 'projects:tracker' %}?type=verification" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
+    <a href="{% url 'projects:tracker' %}?type=verification" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:.82rem;">
       <i class="bi bi-table me-1"></i>Tracker View
     </a>
   </div>
@@ -60,139 +119,159 @@
 
 {% if messages %}
   {% for msg in messages %}
-    <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show" style="border-radius:10px;font-size:0.85rem;">
+    <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show" style="border-radius:10px;font-size:.85rem;">
       {{ msg }}
       <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
   {% endfor %}
 {% endif %}
 
+{% if not can_edit_any and rows %}
+<div class="viewer-hint">
+  <i class="bi bi-eye"></i>
+  <span>You're viewing in read-only mode. Only M&amp;E officers, administrators, and unit-attached editors can update verification stages.</span>
+</div>
+{% endif %}
+
 <div class="filter-bar d-flex gap-3 align-items-center flex-wrap">
   <input type="search" id="verifSearch" class="form-control form-control-sm"
          placeholder="Search project or cycle…"
-         style="max-width:320px;border-radius:7px;font-size:0.85rem;">
+         style="max-width:320px;border-radius:7px;font-size:.85rem;">
 
-  <select id="statusFilter" class="form-select form-select-sm" style="max-width:200px;border-radius:7px;font-size:0.82rem;">
+  <select id="statusFilter" class="form-select form-select-sm" style="max-width:200px;border-radius:7px;font-size:.82rem;">
     <option value="">All statuses</option>
-    <option value="pending">Pending</option>
-    <option value="field_verification">Field Verification</option>
-    <option value="documentation_review">Documentation Review</option>
-    <option value="validation_meeting">Validation Meeting</option>
-    <option value="completed">Completed</option>
+    {% for s in stages %}<option value="{{ s.key }}">{{ s.label }}</option>{% endfor %}
     <option value="not_applicable">Not Applicable</option>
   </select>
 
   <div class="ms-auto legend">
-    <span class="legend-pill"><span class="dot" style="background:#16a34a;"></span>Completed</span>
+    <span class="legend-pill"><span class="dot" style="background:#16a34a;"></span>Done</span>
     <span class="legend-pill"><span class="dot" style="background:var(--dodo-blue);"></span>In Progress</span>
-    <span class="legend-pill"><span class="dot" style="background:#e2e8f0;"></span>Pending</span>
+    <span class="legend-pill"><span class="dot" style="background:#cbd5e1;"></span>Not Started</span>
   </div>
 </div>
 
-{% for v in verifications %}
-<div class="verification-card"
+{% for row in rows %}
+{% with v=row.v %}
+<div class="v-card {% if v.status == 'completed' %}is-completed{% endif %} {% if v.status == 'not_applicable' %}is-na{% endif %}"
+     id="vcard-{{ v.pk }}"
+     data-pk="{{ v.pk }}"
      data-search="{{ v.project.title|lower }} {{ v.project.pims_id|lower }} {{ v.cycle.year }} {{ v.cycle.quarter|lower }}"
-     data-status="{{ v.status }}">
-  <div class="header">
-    <span class="badge bg-light text-dark" style="font-size:0.72rem;">
-      {{ v.cycle.year }} {{ v.cycle.quarter }}
-    </span>
-    <div class="project-title">
-      {% if v.project.pims_id %}<span style="font-size:0.7rem;color:#94a3b8;font-weight:400;">{{ v.project.pims_id }} · </span>{% endif %}
+     data-status="{{ v.status }}"
+     data-can-edit="{{ row.can_edit|yesno:'1,0' }}">
+
+  <div class="v-head">
+    <span class="cycle-tag">{{ v.cycle.year }} {{ v.cycle.quarter }}</span>
+    <div class="title-block">
+      {% if v.project.programme_unit %}<div class="unit-badge">{{ v.project.programme_unit.name }}</div>{% endif %}
+      {% if v.project.pims_id %}<span class="pims">{{ v.project.pims_id }}</span> · {% endif %}
       <a href="{% url 'projects:detail' v.project.pk %}">{{ v.project.display_title }}</a>
     </div>
 
-    <span class="badge bg-{{ v.get_status_color }}" style="font-size:0.72rem;padding:.3rem .55rem;">
+    <span class="status-pill pill-{{ v.status }}" data-role="status-pill">
       {{ v.get_status_display }}
     </span>
 
-    <div class="dropdown">
-      <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown" style="border-radius:7px;font-size:0.78rem;padding:.2rem .6rem;">
-        <i class="bi bi-three-dots"></i>
-      </button>
-      <div class="dropdown-menu dropdown-menu-end" style="font-size:0.82rem;border-radius:10px;min-width:280px;padding:.75rem;">
-        <form method="post" action="{% url 'monitoring:update_verification' v.pk %}">
-          {% csrf_token %}
-          <label style="font-size:0.74rem;font-weight:600;color:#374151;">Update Status</label>
-          <select name="status" class="form-select form-select-sm mb-2" style="font-size:0.82rem;border-radius:7px;">
-            <option value="pending" {% if v.status == 'pending' %}selected{% endif %}>Pending</option>
-            <option value="field_verification" {% if v.status == 'field_verification' %}selected{% endif %}>Field Verification</option>
-            <option value="documentation_review" {% if v.status == 'documentation_review' %}selected{% endif %}>Documentation Review</option>
-            <option value="validation_meeting" {% if v.status == 'validation_meeting' %}selected{% endif %}>Validation Meeting</option>
-            <option value="completed" {% if v.status == 'completed' %}selected{% endif %}>Completed</option>
-            <option value="not_applicable" {% if v.status == 'not_applicable' %}selected{% endif %}>Not Applicable</option>
-          </select>
-          <label style="font-size:0.74rem;font-weight:600;color:#374151;">Notes</label>
-          <textarea name="notes" class="form-control form-control-sm mb-2" rows="2"
-                    style="font-size:0.82rem;border-radius:7px;"
-                    placeholder="Optional notes about this update…">{{ v.verification_notes }}</textarea>
-          <button type="submit" class="btn btn-sm w-100" style="background:var(--dodo-blue);color:#fff;border-radius:7px;font-size:0.8rem;">
-            <i class="bi bi-check-lg me-1"></i>Save
-          </button>
-        </form>
-      </div>
-    </div>
+    {% if row.can_edit %}
+    <button type="button" class="edit-btn" data-toggle-edit="{{ v.pk }}" title="Edit period &amp; notes">
+      <i class="bi bi-pencil"></i>
+    </button>
+    {% endif %}
   </div>
 
-  <div class="body">
+  <div class="v-body">
     <!-- Stage track -->
-    <div class="stage-track">
-      <div class="stage {% if v.status == 'pending' %}current{% elif v.status != 'pending' %}done{% endif %}">
-        <div class="dot"><i class="bi bi-flag"></i></div>
-        <div class="lbl">Pending</div>
+    <div class="track" data-role="track">
+      {% with done_count=0 %}{% endwith %}
+      <div class="fill" data-role="fill"
+           style="width:{% if v.status == 'not_applicable' %}0%
+                       {% elif v.status == 'pending' %}0%
+                       {% elif v.status == 'field_verification' %}20%
+                       {% elif v.status == 'documentation_review' %}40%
+                       {% elif v.status == 'validation_meeting' %}60%
+                       {% elif v.status == 'completed' %}80%{% endif %};
+                  background:{% if v.status == 'completed' %}#16a34a{% elif v.status == 'not_applicable' %}#e2e8f0{% else %}#16a34a{% endif %};">
       </div>
-      <div class="stage {% if v.field_verification_dates %}{% if v.status == 'field_verification' %}current{% else %}done{% endif %}{% else %}empty{% endif %}">
-        <div class="dot"><i class="bi bi-geo-alt"></i></div>
-        <div class="lbl">Field</div>
-        <div class="date">{{ v.field_verification_dates|default:"—" }}</div>
+
+      {% for s in row.stages %}
+      <div class="stage s-{{ s.state }} {% if forloop.last %}s-final{% endif %} {% if row.can_edit and v.status != 'not_applicable' %}clickable{% endif %}"
+           data-stage="{{ s.key }}"
+           {% if row.can_edit and v.status != 'not_applicable' %}onclick="advanceStage('{{ v.pk }}', '{{ s.key }}')"{% endif %}
+           title="{{ s.label }}{% if s.date %} · {{ s.date }}{% endif %}">
+        <div class="dot">
+          {% if s.state == 'done' %}<i class="bi bi-check-lg"></i>
+          {% elif s.state == 'na' %}<i class="bi bi-dash"></i>
+          {% else %}<i class="bi bi-{{ s.icon }}"></i>{% endif %}
+        </div>
+        <div class="lbl">{{ s.short }}</div>
+        <div class="date" data-role="stage-date">
+          {% if s.date %}{{ s.date }}
+          {% elif s.state == 'current' %}In progress
+          {% elif s.state == 'future' and row.can_edit %}<span style="color:#cbd5e1;">Click</span>
+          {% else %}—{% endif %}
+        </div>
       </div>
-      <div class="stage {% if v.documentation_review_dates %}{% if v.status == 'documentation_review' %}current{% else %}done{% endif %}{% else %}empty{% endif %}">
-        <div class="dot"><i class="bi bi-file-earmark-text"></i></div>
-        <div class="lbl">Docs</div>
-        <div class="date">{{ v.documentation_review_dates|default:"—" }}</div>
-      </div>
-      <div class="stage {% if v.validation_meeting_dates %}{% if v.status == 'validation_meeting' %}current{% else %}done{% endif %}{% else %}empty{% endif %}">
-        <div class="dot"><i class="bi bi-people"></i></div>
-        <div class="lbl">Validation</div>
-        <div class="date">{{ v.validation_meeting_dates|default:"—" }}</div>
-      </div>
-      <div class="stage {% if v.status == 'completed' %}done{% else %}empty{% endif %}">
-        <div class="dot"><i class="bi bi-check2-circle"></i></div>
-        <div class="lbl">Complete</div>
-        {% if v.verified_at %}
-          <div class="date">{{ v.verified_at|date:"d M" }}</div>
-        {% endif %}
-      </div>
+      {% endfor %}
     </div>
 
-    <div class="meta-row">
-      {% if v.verification_period %}
-        <span><span class="lbl">Period:</span>{{ v.verification_period }}</span>
-      {% endif %}
-      {% if v.final_report_due %}
-        <span><span class="lbl">Report Due:</span>{{ v.final_report_due|date:"d M Y" }}</span>
-      {% endif %}
-      {% if v.verified_by %}
-        <span><span class="lbl">Verified By:</span>{{ v.verified_by.get_full_name|default:v.verified_by.email }}</span>
-      {% endif %}
+    <!-- Edit panel -->
+    {% if row.can_edit %}
+    <div class="edit-panel" id="edit-{{ v.pk }}">
+      <form method="post" action="{% url 'monitoring:update_verification' v.pk %}" data-role="edit-form">
+        {% csrf_token %}
+        <div class="grid">
+          <div>
+            <label>Verification period</label>
+            <input type="text" name="verification_period" value="{{ v.verification_period }}" placeholder="e.g. Oct–Dec 2026">
+          </div>
+          <div>
+            <label>Field verification dates</label>
+            <input type="text" name="field_verification_dates" value="{{ v.field_verification_dates }}" placeholder="e.g. 12–14 Oct">
+          </div>
+          <div>
+            <label>Documentation review dates</label>
+            <input type="text" name="documentation_review_dates" value="{{ v.documentation_review_dates }}" placeholder="e.g. 20 Oct">
+          </div>
+          <div>
+            <label>Validation meeting dates</label>
+            <input type="text" name="validation_meeting_dates" value="{{ v.validation_meeting_dates }}" placeholder="e.g. 28 Oct">
+          </div>
+        </div>
+        <div style="margin-top:.6rem;">
+          <label>Notes</label>
+          <textarea name="notes" rows="2" placeholder="Optional notes about this verification…">{{ v.verification_notes }}</textarea>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn-na" onclick="markNA('{{ v.pk }}')" {% if v.status == 'not_applicable' %}disabled{% endif %}>
+            <i class="bi bi-dash-circle me-1"></i>Mark N/A
+          </button>
+          <button type="submit" class="btn-save"><i class="bi bi-check-lg me-1"></i>Save changes</button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+
+    <div class="meta-row {% if not v.verification_notes %}no-border{% endif %}">
+      {% if v.verification_period %}<span><span class="lbl">Period</span>{{ v.verification_period }}</span>{% endif %}
+      {% if v.final_report_due %}<span><span class="lbl">Report Due</span>{{ v.final_report_due|date:"d M Y" }}</span>{% endif %}
+      {% if v.verified_by %}<span><span class="lbl">Verified by</span><span data-role="verified-by">{{ v.verified_by.get_full_name|default:v.verified_by.email }}</span></span>{% endif %}
+      {% if v.verified_at %}<span><span class="lbl">on</span><span data-role="verified-at">{{ v.verified_at|date:"d M Y" }}</span></span>{% endif %}
     </div>
 
     {% if v.verification_notes %}
-      <div class="notes-box">
-        <i class="bi bi-sticky me-1"></i>{{ v.verification_notes }}
-      </div>
+      <div class="notes-box"><i class="bi bi-sticky me-1"></i>{{ v.verification_notes }}</div>
     {% endif %}
   </div>
 </div>
+{% endwith %}
 {% empty %}
 <div class="card">
   <div class="empty-state">
     <i class="bi bi-shield-check"></i>
     <h6 style="font-weight:600;color:#1e293b;">No verifications yet</h6>
-    <p style="font-size:0.85rem;max-width:420px;margin:.5rem auto 1rem;">
+    <p style="font-size:.85rem;max-width:420px;margin:.5rem auto 1rem;">
       Output verifications are created per project and reporting cycle.
-      They track field visits, documentation review, and validation meetings
-      before a report can be finalized.
+      They track field visits, documentation review, and validation meetings before a report can be finalized.
     </p>
     <a href="{% url 'projects:tracker' %}?type=verification" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">
       <i class="bi bi-table me-1"></i>Open Tracker
@@ -204,13 +283,171 @@
 <div id="noResults" class="card mt-3" style="display:none;">
   <div class="empty-state" style="padding:1.5rem;">
     <i class="bi bi-search" style="font-size:1.5rem;"></i>
-    <div style="font-size:0.85rem;">No verifications match your filters.</div>
+    <div style="font-size:.85rem;">No verifications match your filters.</div>
   </div>
 </div>
+
+<div class="toast-stack" id="toastStack"></div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+const CSRF = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+
+function toast(msg, isError) {
+  const stack = document.getElementById('toastStack');
+  const t = document.createElement('div');
+  t.className = 't' + (isError ? ' err' : '');
+  t.textContent = msg;
+  stack.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .25s'; setTimeout(() => t.remove(), 250); }, 2200);
+}
+
+const STAGE_ORDER = ['pending', 'field_verification', 'documentation_review', 'validation_meeting', 'completed'];
+const PILL_LABELS = {
+  pending: 'Pending',
+  field_verification: 'Field Verification',
+  documentation_review: 'Documentation Review',
+  validation_meeting: 'Validation Meeting',
+  completed: 'Completed',
+  not_applicable: 'Not Applicable',
+};
+
+async function postAction(pk, formData) {
+  const res = await fetch(`/monitoring/verification/${pk}/update/`, {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': CSRF },
+    body: formData,
+  });
+  if (!res.ok) {
+    let msg = 'Update failed';
+    if (res.status === 403) msg = "You don't have permission to update this.";
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+function repaintCard(pk, data) {
+  const card = document.getElementById('vcard-' + pk);
+  if (!card) return;
+  card.dataset.status = data.status;
+  card.classList.toggle('is-na', data.status === 'not_applicable');
+  card.classList.toggle('is-completed', data.status === 'completed');
+
+  // Status pill
+  const pill = card.querySelector('[data-role="status-pill"]');
+  if (pill) {
+    pill.textContent = PILL_LABELS[data.status] || data.status_display;
+    pill.className = 'status-pill pill-' + data.status;
+  }
+
+  // Track fill
+  const fill = card.querySelector('[data-role="fill"]');
+  if (fill) {
+    const widths = { pending: '0%', field_verification: '20%', documentation_review: '40%', validation_meeting: '60%', completed: '80%', not_applicable: '0%' };
+    fill.style.width = widths[data.status] || '0%';
+    fill.style.background = data.status === 'not_applicable' ? '#e2e8f0' : '#16a34a';
+  }
+
+  // Stages
+  const stageEls = card.querySelectorAll('.stage');
+  data.stages.forEach((s, i) => {
+    const el = stageEls[i];
+    if (!el) return;
+    el.classList.remove('s-done', 's-current', 's-future', 's-na');
+    el.classList.add('s-' + s.state);
+    const dateEl = el.querySelector('[data-role="stage-date"]');
+    if (dateEl) {
+      if (s.date) dateEl.textContent = s.date;
+      else if (s.state === 'current') dateEl.textContent = 'In progress';
+      else if (s.state === 'future') dateEl.innerHTML = '<span style="color:#cbd5e1;">Click</span>';
+      else dateEl.textContent = '—';
+    }
+    // Refresh dot icon
+    const dot = el.querySelector('.dot');
+    if (dot) {
+      const stageKey = el.dataset.stage;
+      let inner;
+      if (s.state === 'done') inner = '<i class="bi bi-check-lg"></i>';
+      else if (s.state === 'na') inner = '<i class="bi bi-dash"></i>';
+      else {
+        const iconMap = { pending: 'flag', field_verification: 'geo-alt', documentation_review: 'file-earmark', validation_meeting: 'people', completed: 'check2-circle' };
+        inner = `<i class="bi bi-${iconMap[stageKey] || 'circle'}"></i>`;
+      }
+      dot.innerHTML = inner;
+    }
+  });
+
+  // Verifier metadata
+  const vbEl = card.querySelector('[data-role="verified-by"]');
+  if (vbEl) vbEl.textContent = data.verified_by || '';
+  const vaEl = card.querySelector('[data-role="verified-at"]');
+  if (vaEl) vaEl.textContent = data.verified_at || '';
+}
+
+async function advanceStage(pk, stageKey) {
+  const card = document.getElementById('vcard-' + pk);
+  if (!card || card.dataset.canEdit !== '1') return;
+  // If clicking the current stage, no-op (avoid noise)
+  if (card.dataset.status === stageKey) return;
+
+  const fd = new FormData();
+  fd.append('action', 'advance');
+  fd.append('stage', stageKey);
+  try {
+    const data = await postAction(pk, fd);
+    repaintCard(pk, data);
+    toast('Stage updated to ' + (PILL_LABELS[stageKey] || stageKey));
+  } catch (e) {
+    toast(e.message || 'Update failed', true);
+  }
+}
+
+async function markNA(pk) {
+  if (!confirm('Mark this verification as Not Applicable for this cycle?')) return;
+  const fd = new FormData();
+  fd.append('action', 'na');
+  try {
+    const data = await postAction(pk, fd);
+    repaintCard(pk, data);
+    toast('Marked as Not Applicable');
+  } catch (e) {
+    toast(e.message || 'Update failed', true);
+  }
+}
+
+// Edit-panel toggle + AJAX form submit
+document.querySelectorAll('[data-toggle-edit]').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const pk = this.getAttribute('data-toggle-edit');
+    const panel = document.getElementById('edit-' + pk);
+    if (!panel) return;
+    panel.classList.toggle('is-open');
+    this.classList.toggle('is-open', panel.classList.contains('is-open'));
+  });
+});
+
+document.querySelectorAll('[data-role="edit-form"]').forEach(form => {
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const card = form.closest('.v-card');
+    const pk = card.dataset.pk;
+    const fd = new FormData(form);
+    fd.append('action', 'update');
+    try {
+      const data = await postAction(pk, fd);
+      repaintCard(pk, data);
+      toast('Saved');
+      // Close panel after successful save
+      document.getElementById('edit-' + pk)?.classList.remove('is-open');
+      card.querySelector('[data-toggle-edit]')?.classList.remove('is-open');
+    } catch (err) {
+      toast(err.message || 'Save failed', true);
+    }
+  });
+});
+
+// Filtering
 const search = document.getElementById('verifSearch');
 const statusFilter = document.getElementById('statusFilter');
 const noResults = document.getElementById('noResults');
@@ -219,7 +456,7 @@ function applyFilter() {
   const q = (search.value || '').trim().toLowerCase();
   const s = statusFilter.value;
   let visible = 0;
-  document.querySelectorAll('.verification-card').forEach(el => {
+  document.querySelectorAll('.v-card').forEach(el => {
     const hay = el.dataset.search || '';
     const matchesSearch = !q || hay.indexOf(q) !== -1;
     const matchesStatus = !s || el.dataset.status === s;
@@ -227,10 +464,9 @@ function applyFilter() {
     el.style.display = show ? '' : 'none';
     if (show) visible++;
   });
-  const hasAny = document.querySelectorAll('.verification-card').length > 0;
+  const hasAny = document.querySelectorAll('.v-card').length > 0;
   noResults.style.display = (hasAny && visible === 0) ? '' : 'none';
 }
-
 search?.addEventListener('input', applyFilter);
 statusFilter?.addEventListener('change', applyFilter);
 </script>

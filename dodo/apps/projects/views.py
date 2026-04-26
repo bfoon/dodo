@@ -17,6 +17,12 @@ from .models import (
     DonorReportingTimeline, CPDFramework, CPDOutcome, CPDIndicator,
 )
 
+from apps.accounts.scoping import (
+    is_admin, is_me_officer, role_label,
+    tracker_access, user_can_edit_tracker_for, user_can_see_project,
+    user_projects, user_units,
+)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -196,24 +202,6 @@ class ProjectEditView(LoginRequiredMixin, View):
             return redirect('projects:edit', pk=pk)
         return redirect('projects:detail', pk=pk)
 
-
-class UpdateProjectStatusView(LoginRequiredMixin, View):
-    def post(self, request, pk):
-        project = get_object_or_404(Project, pk=pk)
-        cycle_id = request.POST.get('cycle_id')
-        status = request.POST.get('status')
-        if cycle_id and status:
-            cycle = get_object_or_404(ReportingCycle, pk=cycle_id)
-            obj, _ = ProjectReportingStatus.objects.get_or_create(project=project, cycle=cycle)
-            obj.status = status
-            if 'notes' in request.POST:
-                obj.notes = request.POST.get('notes', '')
-            obj.updated_by = request.user
-            obj.save()
-            messages.success(request, 'Status updated.')
-        return redirect(request.META.get('HTTP_REFERER', 'projects:tracker'))
-
-
 # ---------------------------------------------------------------------------
 # Reporting Cycles — list + create / edit / delete via modals
 # ---------------------------------------------------------------------------
@@ -235,32 +223,111 @@ class ReportingCycleListView(LoginRequiredMixin, View):
         })
 
 
-class ReportingCycleCreateView(CountryAdminRequiredMixin, LoginRequiredMixin, View):
+VALID_QUARTERS = ('Q1', 'Q2', 'Q3', 'Q4')
+VALID_TYPES = ('progress', 'verification')
+
+
+def _today_year_quarter():
+    today = timezone.now().date()
+    quarter = f'Q{((today.month - 1) // 3) + 1}'
+    return today.year, quarter
+
+
+class ReportingCycleCreateView(LoginRequiredMixin, View):
+    """
+    Create a new reporting cycle. Supports prefill via query string:
+        ?year=2026&quarter=Q2&type=progress
+    so the dashboard "Create cycle" link can drop you in with values
+    already filled.
+    """
+
+    def _check_permission(self, request):
+        co = getattr(request, 'active_country_office', None)
+        return is_admin(request.user, co) or is_me_officer(request.user, co)
+
+    def _initial(self, request):
+        today_year, today_quarter = _today_year_quarter()
+        try:
+            year = int(request.GET.get('year') or today_year)
+        except (TypeError, ValueError):
+            year = today_year
+
+        quarter = request.GET.get('quarter') or today_quarter
+        if quarter not in VALID_QUARTERS:
+            quarter = today_quarter
+
+        cycle_type = request.GET.get('type') or 'progress'
+        if cycle_type not in VALID_TYPES:
+            cycle_type = 'progress'
+
+        return {
+            'year': year,
+            'quarter': quarter,
+            'cycle_type': cycle_type,
+            'today_year': today_year,
+            'today_quarter': today_quarter,
+            'is_prefilled': bool(
+                request.GET.get('year') or request.GET.get('quarter')
+            ),
+        }
+
+    def get(self, request):
+        if not self._check_permission(request):
+            from django.http import HttpResponseForbidden
+            return HttpResponseForbidden(
+                "Only M&E officers and administrators can create cycles."
+            )
+        return render(request, 'projects/cycle_form.html', {
+            'mode': 'create',
+            'initial': self._initial(request),
+            'years': list(range(timezone.now().year - 1, timezone.now().year + 4)),
+            'quarters': VALID_QUARTERS,
+            'cycle_types': VALID_TYPES,
+        })
+
     def post(self, request):
+        if not self._check_permission(request):
+            from django.http import HttpResponseForbidden
+            return HttpResponseForbidden("Permission denied.")
+
         co = getattr(request, 'active_country_office', None)
         if not co:
             messages.error(request, 'No active country office.')
-            return redirect('projects:cycles')
+            return redirect('projects:cycle_create')
 
-        form = ReportingCycleForm(request.POST)
-        if form.is_valid():
-            cycle = form.save(commit=False)
-            cycle.country_office = co
-            try:
-                cycle.save()
-                messages.success(
-                    request,
-                    f'Cycle {cycle.year} {cycle.quarter} ({cycle.get_cycle_type_display()}) created.'
-                )
-            except Exception as e:
-                messages.error(request, f'Could not create cycle: {e}')
-        else:
-            messages.error(
-                request,
-                'Please fix the errors: ' + '; '.join(
-                    f'{k}: {", ".join(v)}' for k, v in form.errors.items()
-                )
-            )
+        try:
+            year = int(request.POST.get('year'))
+        except (TypeError, ValueError):
+            messages.error(request, 'Invalid year.')
+            return redirect('projects:cycle_create')
+
+        quarter = request.POST.get('quarter')
+        cycle_type = request.POST.get('cycle_type')
+        if quarter not in VALID_QUARTERS or cycle_type not in VALID_TYPES:
+            messages.error(request, 'Invalid quarter or cycle type.')
+            return redirect('projects:cycle_create')
+
+        # Idempotent: if a cycle already exists for this (CO, year, quarter,
+        # cycle_type), update it rather than failing with IntegrityError.
+        cycle, created = ReportingCycle.objects.update_or_create(
+            country_office=co,
+            year=year,
+            quarter=quarter,
+            cycle_type=cycle_type,
+            defaults={
+                'reporting_timeline': request.POST.get('reporting_timeline', ''),
+                'submission_deadline': request.POST.get('submission_deadline') or None,
+                'programme_review_dates': request.POST.get('programme_review_dates', ''),
+                'pmsu_review_dates': request.POST.get('pmsu_review_dates', ''),
+                'final_clearance_dates': request.POST.get('final_clearance_dates', ''),
+                'final_report_due': request.POST.get('final_report_due') or None,
+            },
+        )
+        verb = 'created' if created else 'updated'
+        messages.success(
+            request,
+            f'Reporting cycle {year} {quarter} ({cycle.get_cycle_type_display()}) {verb}.',
+        )
         return redirect('projects:cycles')
 
 
@@ -308,66 +375,169 @@ class ReportingCycleDeleteView(CountryAdminRequiredMixin, LoginRequiredMixin, Vi
 # Tracker (unchanged)
 # ---------------------------------------------------------------------------
 
+QUARTER_ORDER = ['Q1', 'Q2', 'Q3', 'Q4']
+ALL_QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4']
+
+
 class ReportingTrackerView(LoginRequiredMixin, View):
     def get(self, request):
+        from apps.projects.models import (
+            ProgrammeUnit, Project, ProjectReportingStatus, ReportingCycle,
+        )
+
         co = getattr(request, 'active_country_office', None)
-        year = int(request.GET.get('year', timezone.now().year))
-        cycle_type = request.GET.get('type', 'progress')
-        quarters = ['Q1', 'Q2', 'Q3', 'Q4']
+        access = tracker_access(request.user, co)
 
-        projects = (
-            Project.objects.filter(country_office=co).select_related('programme_unit')
-            if co else Project.objects.none()
+        if access == 'none':
+            return HttpResponseForbidden(
+                "The reporting tracker is reserved for M&E officers, "
+                "country-office administrators, and unit-attached editors. "
+                "Contact your country-office administrator if you need access."
+            )
+
+        # Filters
+        try:
+            year = int(request.GET.get('year') or timezone.now().year)
+        except (TypeError, ValueError):
+            year = timezone.now().year
+        cycle_type = request.GET.get('type') or 'progress'
+        if cycle_type not in ('progress', 'verification'):
+            cycle_type = 'progress'
+
+        unit_filter_id = request.GET.get('unit')
+
+        # Available years for the selector
+        year_qs = (
+            ReportingCycle.objects
+            .filter(country_office=co, cycle_type=cycle_type) if co
+            else ReportingCycle.objects.none()
         )
-        units = (
-            ProgrammeUnit.objects.filter(country_office=co, is_active=True)
-            if co else ProgrammeUnit.objects.none()
+        years = sorted(set(year_qs.values_list('year', flat=True)), reverse=True)
+        if year not in years and years:
+            year = years[0]
+        if not years:
+            years = [timezone.now().year]
+
+        # Cycles for the selected year, ordered Q1..Q4
+        cycles = list(
+            year_qs.filter(year=year)
+            .order_by('quarter')
+        )
+        cycles_by_quarter = {c.quarter: c for c in cycles}
+
+        # Visible units (scoped)
+        visible_units = user_units(request.user, co)
+        if unit_filter_id and access == 'global':
+            visible_units = visible_units.filter(pk=unit_filter_id)
+
+        # Projects within those units
+        projects_qs = (
+            Project.objects
+            .filter(country_office=co, programme_unit__in=visible_units)
+            .select_related('programme_unit')
+            .order_by('programme_unit__name', 'title')
         )
 
-        cycles_qs = ReportingCycle.objects.filter(
-            country_office=co, year=year, cycle_type=cycle_type
-        ) if co else ReportingCycle.objects.none()
-        cycles_by_quarter = {c.quarter: c for c in cycles_qs}
+        # Status rows for current year+cycle_type
+        cycle_ids = [c.pk for c in cycles]
+        status_rows = {}
+        if cycle_ids:
+            for s in ProjectReportingStatus.objects.filter(
+                    project__in=projects_qs, cycle_id__in=cycle_ids,
+            ).select_related('cycle'):
+                status_rows[(s.project_id, s.cycle.quarter)] = s
 
-        cycle_ids = [c.pk for c in cycles_by_quarter.values()]
-        statuses_qs = ProjectReportingStatus.objects.filter(
-            project__in=projects, cycle_id__in=cycle_ids
-        ) if cycle_ids else ProjectReportingStatus.objects.none()
-        status_map = {(s.project_id, s.cycle_id): s for s in statuses_qs}
-
-        tracker_data = []
-        for unit in units:
-            unit_projects = projects.filter(programme_unit=unit)
-            rows = []
-            for project in unit_projects:
-                row = {'project': project, 'statuses': {}}
-                for q in quarters:
-                    cycle = cycles_by_quarter.get(q)
-                    row['statuses'][q] = status_map.get((project.pk, cycle.pk)) if cycle else None
-                rows.append(row)
-            tracker_data.append({'unit': unit, 'rows': rows})
-
-        orphan_projects = projects.filter(programme_unit__isnull=True)
-        if orphan_projects.exists():
-            rows = []
-            for project in orphan_projects:
-                row = {'project': project, 'statuses': {}}
-                for q in quarters:
-                    cycle = cycles_by_quarter.get(q)
-                    row['statuses'][q] = status_map.get((project.pk, cycle.pk)) if cycle else None
-                rows.append(row)
-            tracker_data.append({
-                'unit': type('Unit', (), {
-                    'name': 'Unassigned', 'color': '#94a3b8', 'pk': None,
-                })(),
-                'rows': rows,
+        # Group projects by unit for the cluster-row layout
+        groups_dict = {}
+        for p in projects_qs:
+            unit = p.programme_unit
+            key = unit.pk if unit else None
+            if key not in groups_dict:
+                groups_dict[key] = {'unit': unit, 'rows': []}
+            row_statuses = {}
+            for q in ALL_QUARTERS:
+                row_statuses[q] = status_rows.get((p.pk, q))
+            groups_dict[key]['rows'].append({
+                'project': p,
+                'statuses': row_statuses,
+                'can_edit': user_can_edit_tracker_for(request.user, p),
             })
 
+        # Stable ordering by unit name; "no unit" group goes last
+        tracker_data = sorted(
+            groups_dict.values(),
+            key=lambda g: (g['unit'] is None, g['unit'].name if g['unit'] else ''),
+        )
+
         return render(request, 'projects/tracker.html', {
-            'tracker_data': tracker_data, 'year': year, 'quarters': quarters,
-            'cycle_type': cycle_type, 'years': [2024, 2025, 2026, 2027, 2028],
-            'cycles': cycles_qs,
+            'tracker_data': tracker_data,
+            'years': years,
+            'year': year,
+            'quarters': ALL_QUARTERS,
+            'cycles_by_quarter': cycles_by_quarter,
+            'cycle_type': cycle_type,
+            'tracker_access': access,
+            'role_label': role_label(request.user, co),
+            'unit_options': user_units(request.user, co) if access == 'global' else None,
+            'unit_filter_id': unit_filter_id,
         })
+
+
+class UpdateProjectStatusView(LoginRequiredMixin, View):
+    """
+    Tracker write — used by the per-cell dropdown.
+    Enforces: actor must be able to edit THIS project's unit.
+    """
+
+    def post(self, request, pk):
+        from apps.projects.models import (
+            Project, ProjectReportingStatus, ReportingCycle,
+        )
+
+        project = get_object_or_404(Project, pk=pk)
+        if not user_can_see_project(request.user, project):
+            return HttpResponseForbidden("Project not in your scope.")
+        if not user_can_edit_tracker_for(request.user, project):
+            return HttpResponseForbidden(
+                "Only M&E officers, administrators, and editors assigned to "
+                "this unit can update its tracker."
+            )
+
+        cycle_id = request.POST.get('cycle_id')
+        new_status = request.POST.get('status')
+        notes = request.POST.get('notes', '').strip()
+
+        if not cycle_id or not new_status:
+            messages.error(request, 'Cycle and status are required.')
+            return redirect(request.META.get('HTTP_REFERER', 'projects:tracker'))
+
+        cycle = get_object_or_404(ReportingCycle, pk=cycle_id)
+        valid_statuses = {c[0] for c in ProjectReportingStatus.STATUS_CHOICES}
+        if new_status not in valid_statuses:
+            messages.error(request, 'Invalid status.')
+            return redirect(request.META.get('HTTP_REFERER', 'projects:tracker'))
+
+        obj, _ = ProjectReportingStatus.objects.update_or_create(
+            project=project, cycle=cycle,
+            defaults={
+                'status': new_status,
+                'notes': notes or '',
+                'updated_by': request.user,
+            },
+        )
+
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'ok': True,
+                'status': obj.status,
+                'status_display': obj.get_status_display(),
+                'status_color': obj.get_status_color(),
+            })
+
+        messages.success(
+            request, f'Updated {project.display_title} for {cycle.year} {cycle.quarter}.'
+        )
+        return redirect(request.META.get('HTTP_REFERER', 'projects:tracker'))
 
 
 # ---------------------------------------------------------------------------

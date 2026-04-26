@@ -2,94 +2,133 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views import View
 from django.db.models import Count, Q
+from django.http import HttpResponseForbidden
+
+from apps.accounts.scoping import (
+    user_units, user_projects, user_can_see_unit,
+    is_admin, is_me_officer, is_unit_head, role_label,
+)
 
 
 QUARTER_ORDER = ['Q1', 'Q2', 'Q3', 'Q4']
 
 
 class DashboardView(LoginRequiredMixin, View):
+    """
+    Main dashboard. Numbers are scoped to what the user is allowed to see:
+        - admin / M&E officer -> CO-wide
+        - unit head           -> only their unit(s)
+        - data entry / viewer -> only their unit(s) if any, else nothing
+    """
+
     def get(self, request):
         co = getattr(request, 'active_country_office', None)
         from apps.projects.models import (
-            Project, ProgrammeUnit, ProjectReportingStatus, ReportingCycle,
+            ProgrammeUnit, ProjectReportingStatus, ReportingCycle,
         )
         from apps.surveys.models import Survey
 
-        ctx = {'co': co}
-        if co:
-            projects = Project.objects.filter(country_office=co)
-            ctx['total_projects'] = projects.count()
-            ctx['active_projects'] = projects.filter(status='active').count()
-            ctx['ending_projects'] = projects.filter(status='ending').count()
-            ctx['new_projects'] = projects.filter(status='pipeline').count()
+        ctx = {
+            'co': co,
+            'role_label': role_label(request.user, co),
+            'is_me_or_admin': is_admin(request.user, co) or is_me_officer(request.user, co),
+            'is_unit_head': is_unit_head(request.user, co),
+        }
 
-            cycle = (
-                ReportingCycle.objects
-                .filter(country_office=co, cycle_type='progress')
-                .order_by('-year', '-quarter')
-                .first()
+        if not co:
+            return render(request, 'dashboard/home.html', ctx)
+
+        # Visible projects/units for THIS user
+        projects = user_projects(request.user, co)
+        units = user_units(request.user, co)
+
+        ctx['total_projects'] = projects.count()
+        ctx['active_projects'] = projects.filter(status='active').count()
+        ctx['ending_projects'] = projects.filter(status='ending').count()
+        ctx['new_projects'] = projects.filter(status='pipeline').count()
+
+        cycle = (
+            ReportingCycle.objects
+            .filter(country_office=co, cycle_type='progress')
+            .order_by('-year', '-quarter')
+            .first()
+        )
+
+        # Per-unit reporting status, scoped to the user's visible units
+        unit_qs = (
+            units.annotate(
+                project_count=Count(
+                    'projects',
+                    filter=Q(projects__country_office=co),
+                    distinct=True,
+                )
             )
+            .order_by('name')
+        )
 
-            unit_qs = (
-                ProgrammeUnit.objects
-                .filter(country_office=co, is_active=True)
-                .annotate(
-                    project_count=Count(
-                        'projects',
-                        filter=Q(projects__country_office=co),
-                        distinct=True,
-                    )
-                )
-                .order_by('name')
+        status_by_unit = {}
+        if cycle and projects.exists():
+            rows = (
+                ProjectReportingStatus.objects
+                .filter(cycle=cycle, project__in=projects)
+                .values('project__programme_unit_id', 'status')
+                .annotate(n=Count('id'))
             )
-
-            status_by_unit = {}
-            if cycle:
-                rows = (
-                    ProjectReportingStatus.objects
-                    .filter(cycle=cycle, project__country_office=co)
-                    .values('project__programme_unit_id', 'status')
-                    .annotate(n=Count('id'))
+            for r in rows:
+                uid = r['project__programme_unit_id']
+                bucket = status_by_unit.setdefault(
+                    uid, {'submitted': 0, 'pending': 0, 'overdue': 0,
+                          'under_review': 0, 'not_started': 0}
                 )
-                for r in rows:
-                    uid = r['project__programme_unit_id']
-                    bucket = status_by_unit.setdefault(
-                        uid, {'submitted': 0, 'pending': 0, 'overdue': 0,
-                              'under_review': 0, 'not_started': 0}
-                    )
-                    if r['status'] in bucket:
-                        bucket[r['status']] = r['n']
+                if r['status'] in bucket:
+                    bucket[r['status']] = r['n']
 
-            programme_units = []
-            for u in unit_qs:
-                buckets = status_by_unit.get(
-                    u.pk, {'submitted': 0, 'pending': 0, 'overdue': 0,
-                           'under_review': 0, 'not_started': 0}
-                )
-                u.submitted = buckets['submitted']
-                u.pending = buckets['pending']
-                u.overdue = buckets['overdue']
-                programme_units.append(u)
-            ctx['programme_units'] = programme_units
+        programme_units = []
+        for u in unit_qs:
+            buckets = status_by_unit.get(
+                u.pk, {'submitted': 0, 'pending': 0, 'overdue': 0,
+                       'under_review': 0, 'not_started': 0}
+            )
+            u.submitted = buckets['submitted']
+            u.pending = buckets['pending']
+            u.overdue = buckets['overdue']
+            u.under_review = buckets['under_review']
+            u.not_started = buckets['not_started']
+            programme_units.append(u)
+        ctx['programme_units'] = programme_units
 
-            if cycle:
-                ctx['current_cycle'] = cycle
-                statuses = ProjectReportingStatus.objects.filter(cycle=cycle)
-                ctx['cycle_submitted'] = statuses.filter(status='submitted').count()
-                ctx['cycle_pending'] = statuses.filter(status='pending').count()
-                ctx['cycle_under_review'] = statuses.filter(status='under_review').count()
-                ctx['cycle_not_started'] = statuses.filter(status='not_started').count()
+        if cycle:
+            ctx['current_cycle'] = cycle
+            # Cycle stats also scoped
+            statuses = ProjectReportingStatus.objects.filter(
+                cycle=cycle, project__in=projects,
+            )
+            ctx['cycle_submitted'] = statuses.filter(status='submitted').count()
+            ctx['cycle_pending'] = statuses.filter(status='pending').count()
+            ctx['cycle_under_review'] = statuses.filter(status='under_review').count()
+            ctx['cycle_not_started'] = statuses.filter(status='not_started').count()
+            ctx['cycle_overdue'] = statuses.filter(status='overdue').count()
 
-            ctx['recent_surveys'] = Survey.objects.filter(country_office=co).order_by('-created_at')[:5]
-            ctx['active_surveys'] = Survey.objects.filter(country_office=co, status='active').count()
+        # Surveys: M&E/admin see all CO surveys; unit heads see surveys tied
+        # to their projects + unscoped CO surveys (since surveys aren't always
+        # project-bound).
+        survey_qs = Survey.objects.filter(country_office=co)
+        if not (is_admin(request.user, co) or is_me_officer(request.user, co)):
+            survey_qs = survey_qs.filter(
+                Q(project__in=projects) | Q(project__isnull=True, created_by=request.user)
+            )
+        ctx['recent_surveys'] = survey_qs.order_by('-created_at')[:5]
+        ctx['active_surveys'] = survey_qs.filter(status='active').count()
+
         return render(request, 'dashboard/home.html', ctx)
 
 
 class ClusterDashboardView(LoginRequiredMixin, View):
     """
     Programme-cluster page: a projects × cycles matrix.
-    Each row is a project, each column is a quarterly progress cycle,
-    and each cell shows the reporting status for that project/cycle.
+
+    Access: admin / M&E officer can view any unit in the CO; unit heads can
+    only view their own units. Anyone else gets 403.
     """
 
     def get(self, request, unit_id):
@@ -104,15 +143,17 @@ class ClusterDashboardView(LoginRequiredMixin, View):
             **({'country_office': co} if co else {}),
         )
 
-        # Project list, sorted for stable display
+        if not user_can_see_unit(request.user, unit):
+            return HttpResponseForbidden(
+                "You don't have access to this programme unit."
+            )
+
         projects = list(
             Project.objects
             .filter(programme_unit=unit)
             .order_by('-status', 'title')
         )
 
-        # Pull all progress cycles for this CO, oldest → newest so the matrix
-        # reads left to right like a calendar.
         cycle_qs = ReportingCycle.objects.filter(cycle_type='progress')
         if co:
             cycle_qs = cycle_qs.filter(country_office=co)
@@ -122,7 +163,6 @@ class ClusterDashboardView(LoginRequiredMixin, View):
                            if c.quarter in QUARTER_ORDER else 99),
         )
 
-        # Group cycles by year for the two-row table header
         years = []
         cycles_by_year = {}
         for c in cycles:
@@ -132,7 +172,6 @@ class ClusterDashboardView(LoginRequiredMixin, View):
             cycles_by_year[c.year].append(c)
         year_groups = [{'year': y, 'cycles': cycles_by_year[y]} for y in years]
 
-        # One query for all statuses, then bucket by (project_id, cycle_id)
         project_ids = [p.pk for p in projects]
         cycle_ids = [c.pk for c in cycles]
         status_lookup = {}
@@ -144,9 +183,7 @@ class ClusterDashboardView(LoginRequiredMixin, View):
             ):
                 status_lookup[(s.project_id, s.cycle_id)] = s
 
-        # Build matrix rows: each project with one cell per cycle
         rows = []
-        # Summary tally for the strip at the top
         totals = {'submitted': 0, 'under_review': 0, 'pending': 0,
                   'overdue': 0, 'not_started': 0, 'closed': 0,
                   'not_applicable': 0, 'total_cells': 0}
@@ -184,4 +221,5 @@ class ClusterDashboardView(LoginRequiredMixin, View):
             'rows': rows,
             'totals': totals,
             'coverage_pct': coverage_pct,
+            'can_edit': is_admin(request.user, co) or is_me_officer(request.user, co),
         })
