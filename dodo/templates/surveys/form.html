@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% block title %}Create survey{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Home</a></li>
+<li class="breadcrumb-item"><a href="{% url 'surveys:list' %}" class="text-decoration-none" style="color:var(--dodo-blue);">Surveys</a></li>
+<li class="breadcrumb-item active">New survey</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.create-banner { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:1rem 1.25rem; margin-bottom:1rem; display:flex; align-items:center; gap:1rem; }
+.create-banner .swatch { width:48px; height:48px; border-radius:12px; background:rgba(0,119,200,0.12); color:var(--dodo-blue); display:inline-flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0; }
+.create-banner h1 { font-size:1.15rem; font-weight:700; color:#0f172a; margin:0; }
+.create-banner .sub { font-size:0.82rem; color:#64748b; margin-top:.15rem; }
+
+.form-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.5rem 1.6rem; margin-bottom:1rem; }
+.form-card .section-title { font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#64748b; margin-bottom:1rem; padding-bottom:.5rem; border-bottom:1px dashed #e2e8f0; display:flex; align-items:center; gap:.4rem; }
+.form-card .section-title i { color:var(--dodo-blue); }
+
+.field { margin-bottom:1.1rem; }
+.field label { display:block; font-size:0.82rem; font-weight:600; color:#0f172a; margin-bottom:.35rem; }
+.field label .req { color:#dc2626; margin-left:.2rem; }
+.field .help { font-size:0.74rem; color:#94a3b8; margin-top:.25rem; }
+.field input[type="text"],
+.field textarea,
+.field select { width:100%; font-size:0.9rem; padding:.55rem .7rem; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#0f172a; transition:border-color .15s, box-shadow .15s; }
+.field input[type="text"]:focus,
+.field textarea:focus,
+.field select:focus { outline:none; border-color:var(--dodo-blue); box-shadow:0 0 0 3px rgba(0,119,200,.15); }
+.field textarea { resize:vertical; min-height:80px; line-height:1.5; }
+
+.toggle-row { display:flex; align-items:flex-start; gap:.75rem; padding:.7rem .85rem; border:1px solid #e2e8f0; border-radius:9px; background:#fafbfc; margin-bottom:.6rem; cursor:pointer; transition:background .15s, border-color .15s; }
+.toggle-row:hover { background:#f1f5f9; border-color:#cbd5e1; }
+.toggle-row input[type="checkbox"] { margin-top:.15rem; width:1rem; height:1rem; flex-shrink:0; accent-color:var(--dodo-blue); }
+.toggle-row .toggle-text { flex-grow:1; }
+.toggle-row .toggle-title { font-size:0.85rem; font-weight:600; color:#0f172a; }
+.toggle-row .toggle-help { font-size:0.74rem; color:#64748b; margin-top:.15rem; }
+
+.form-actions { display:flex; gap:.6rem; justify-content:flex-end; padding-top:.5rem; border-top:1px dashed #e2e8f0; margin-top:1rem; }
+.btn-primary-blue { background:var(--dodo-blue); color:#fff; border:none; padding:.55rem 1.2rem; border-radius:8px; font-size:0.85rem; font-weight:600; display:inline-flex; align-items:center; gap:.4rem; }
+.btn-primary-blue:hover { background:#005a99; color:#fff; }
+.btn-cancel { background:#f1f5f9; color:#475569; border:none; padding:.55rem 1.2rem; border-radius:8px; font-size:0.85rem; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:.4rem; }
+.btn-cancel:hover { background:#e2e8f0; color:#1e293b; }
+
+@media (max-width: 640px) {
+  .form-actions { flex-direction:column-reverse; }
+  .form-actions .btn-primary-blue,
+  .form-actions .btn-cancel { width:100%; justify-content:center; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="create-banner">
+  <div class="swatch"><i class="bi bi-clipboard-plus"></i></div>
+  <div style="flex-grow:1;">
+    <h1>Create a new survey</h1>
+    <div class="sub">Set up the basics now — you'll add questions in the next step.</div>
+  </div>
+</div>
+
+<form method="post" action="{% url 'surveys:create' %}" novalidate>
+  {% csrf_token %}
+
+  <!-- Basics -->
+  <div class="form-card">
+    <div class="section-title"><i class="bi bi-pencil-square"></i>Basics</div>
+
+    <div class="field">
+      <label for="title">Title <span class="req">*</span></label>
+      <input type="text" id="title" name="title" required maxlength="255"
+             placeholder="e.g. Mid-year community feedback"
+             value="{{ request.POST.title|default:'' }}">
+      <div class="help">A short, descriptive name. Respondents will see this at the top of the form.</div>
+    </div>
+
+    <div class="field">
+      <label for="survey_type">Survey type</label>
+      <select id="survey_type" name="survey_type">
+        {% for value, label in survey_types %}
+        <option value="{{ value }}" {% if request.POST.survey_type == value or not request.POST.survey_type and value == 'quick' %}selected{% endif %}>
+          {{ label }}
+        </option>
+        {% endfor %}
+      </select>
+      <div class="help">Pick the closest match — this only affects how the survey appears in lists and dashboards.</div>
+    </div>
+
+    <div class="field">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" rows="3"
+                placeholder="One or two sentences explaining what this survey is for.">{{ request.POST.description|default:'' }}</textarea>
+      <div class="help">Shown on the survey detail page (admin view) and in any preview cards. Optional.</div>
+    </div>
+
+    <div class="field" style="margin-bottom:0;">
+      <label for="instructions">Instructions for respondents</label>
+      <textarea id="instructions" name="instructions" rows="3"
+                placeholder="Anything respondents need to know before starting (e.g. 'Takes about 5 minutes', confidentiality notes…).">{{ request.POST.instructions|default:'' }}</textarea>
+      <div class="help">Displayed at the top of the public response form. Optional.</div>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="form-card">
+    <div class="section-title"><i class="bi bi-sliders"></i>Settings</div>
+
+    <label class="toggle-row" for="is_anonymous">
+      <input type="checkbox" id="is_anonymous" name="is_anonymous" value="1"
+             {% if request.POST.is_anonymous %}checked{% endif %}>
+      <span class="toggle-text">
+        <span class="toggle-title"><i class="bi bi-eye-slash me-1" style="color:#7c3aed;"></i>Anonymous responses</span>
+        <span class="toggle-help">Don't link responses to logged-in user accounts. Respondent names will not be stored or shown in results.</span>
+      </span>
+    </label>
+
+    <label class="toggle-row" for="allow_multiple">
+      <input type="checkbox" id="allow_multiple" name="allow_multiple" value="1"
+             {% if request.POST.allow_multiple %}checked{% endif %}>
+      <span class="toggle-text">
+        <span class="toggle-title"><i class="bi bi-arrow-repeat me-1" style="color:#16a34a;"></i>Allow multiple submissions</span>
+        <span class="toggle-help">Let the same person submit more than once. Useful for ongoing check-ins; turn off for one-shot surveys.</span>
+      </span>
+    </label>
+  </div>
+
+  <div class="form-actions">
+    <a href="{% url 'surveys:list' %}" class="btn-cancel">
+      <i class="bi bi-x-lg"></i>Cancel
+    </a>
+    <button type="submit" class="btn-primary-blue">
+      <i class="bi bi-check2"></i>Create &amp; add questions
+    </button>
+  </div>
+</form>
+{% endblock %}

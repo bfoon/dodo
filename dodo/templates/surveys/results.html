@@ -9,6 +9,9 @@
 {% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin="" />
 <style>
 .results-banner { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:1rem 1.25rem; margin-bottom:1rem; display:flex; align-items:center; gap:1rem; }
 .results-banner .swatch { width:48px; height:48px; border-radius:12px; background:rgba(0,119,200,0.12); color:var(--dodo-blue); display:inline-flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0; }
@@ -65,6 +68,40 @@
 
 .no-data { padding:3rem 1rem; text-align:center; color:#64748b; }
 .no-data i { font-size:2.5rem; color:#cbd5e1; display:block; margin-bottom:.5rem; }
+
+/* Filter & toolbar */
+.toolbar { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:.85rem 1rem; margin-bottom:1rem; }
+.toolbar .form-row { display:flex; gap:.6rem; flex-wrap:wrap; align-items:end; }
+.toolbar label { font-size:0.7rem; text-transform:uppercase; letter-spacing:.04em; font-weight:600; color:#64748b; display:block; margin-bottom:.2rem; }
+.toolbar input, .toolbar select { font-size:0.85rem; padding:.4rem .55rem; border:1px solid #cbd5e1; border-radius:7px; background:#fff; }
+.toolbar input:focus, .toolbar select:focus { outline:2px solid #0077c8; outline-offset:-1px; border-color:#0077c8; }
+.toolbar .form-check-input { width:1rem; height:1rem; }
+.toolbar .filter-actions { display:flex; gap:.4rem; }
+.toolbar .btn-apply { background:var(--dodo-blue); color:#fff; border:none; padding:.45rem .9rem; border-radius:7px; font-size:0.82rem; font-weight:600; }
+.toolbar .btn-clear { background:#f1f5f9; color:#475569; border:none; padding:.45rem .9rem; border-radius:7px; font-size:0.82rem; font-weight:600; }
+.toolbar .btn-export { background:#16a34a; color:#fff; border:none; padding:.45rem .9rem; border-radius:7px; font-size:0.82rem; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:.35rem; }
+.toolbar .btn-export:hover { background:#15803d; color:#fff; }
+.filter-chips { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.6rem; }
+.filter-chip { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:99px; padding:.18rem .65rem; font-size:0.72rem; font-weight:600; }
+
+/* Sentiment & extra stat chips for text answers */
+.sent-chips { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.5rem; }
+.sent-chip { font-size:0.72rem; padding:.18rem .55rem; border-radius:99px; font-weight:600; }
+.sent-chip.pos { background:#dcfce7; color:#166534; }
+.sent-chip.neu { background:#f1f5f9; color:#475569; }
+.sent-chip.neg { background:#fee2e2; color:#991b1b; }
+
+/* Matrix breakdown table */
+.matrix-summary { margin-top:.75rem; font-size:0.82rem; }
+.matrix-summary table { width:100%; border-collapse:collapse; }
+.matrix-summary th, .matrix-summary td { padding:.4rem .6rem; border-bottom:1px solid #f1f5f9; text-align:left; }
+.matrix-summary th { font-size:0.7rem; text-transform:uppercase; letter-spacing:.03em; color:#64748b; background:#f8fafc; }
+.matrix-summary td.num { text-align:right; font-variant-numeric:tabular-nums; }
+
+/* Crosstab pivot cards */
+.crosstab-pivot { background:#fafbfc; border:1px solid #f1f5f9; border-radius:10px; padding:.85rem 1rem; margin-bottom:.8rem; }
+.crosstab-pivot .pivot-title { font-size:0.85rem; font-weight:700; color:#0f172a; margin-bottom:.35rem; }
+.crosstab-pivot .pivot-meta { font-size:0.72rem; color:#94a3b8; margin-bottom:.5rem; }
 </style>
 {% endblock %}
 
@@ -90,8 +127,76 @@
     <a href="{% url 'surveys:builder' survey.pk %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:0.82rem;">
       <i class="bi bi-pencil-square me-1"></i>Builder
     </a>
+    {% if total_responses > 0 %}
+    <a href="{% url 'surveys:export' survey.pk %}{% if export_querystring %}?{{ export_querystring }}{% endif %}"
+       class="btn btn-sm" style="background:#16a34a;color:#fff;border-radius:8px;font-size:0.82rem;">
+      <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+    </a>
+    {% endif %}
   </div>
 </div>
+
+{% if total_responses > 0 or filters.is_active %}
+<form method="get" class="toolbar">
+  <div class="form-row">
+    <div>
+      <label for="filter-from">From</label>
+      <input type="date" id="filter-from" name="from" value="{{ filters.from }}">
+    </div>
+    <div>
+      <label for="filter-to">To</label>
+      <input type="date" id="filter-to" name="to" value="{{ filters.to }}">
+    </div>
+    <div>
+      <label for="filter-completed">Status</label>
+      <select id="filter-completed" name="completed">
+        <option value="" {% if not filters.completed_only %}selected{% endif %}>All responses</option>
+        <option value="1" {% if filters.completed_only %}selected{% endif %}>Completed only</option>
+      </select>
+    </div>
+    {% if respondent_options %}
+    <div>
+      <label for="filter-respondent">Respondent</label>
+      <select id="filter-respondent" name="respondent">
+        <option value="">Anyone</option>
+        {% for rid, rname in respondent_options %}
+        <option value="{{ rid }}" {% if filters.respondent_id == rid %}selected{% endif %}>{{ rname }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% if crosstab_options %}
+    <div>
+      <label for="filter-groupby">Cross-tab by</label>
+      <select id="filter-groupby" name="group_by">
+        <option value="">— none —</option>
+        {% for opt in crosstab_options %}
+        <option value="{{ opt.id }}" {% if filters.group_by_qid == opt.id %}selected{% endif %}>
+          Q{{ opt.order }}. {{ opt.text|truncatechars:40 }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="filter-actions">
+      <button type="submit" class="btn-apply"><i class="bi bi-funnel me-1"></i>Apply</button>
+      {% if filters.is_active %}
+      <a href="{% url 'surveys:results' survey.pk %}" class="btn-clear">Clear</a>
+      {% endif %}
+    </div>
+  </div>
+  {% if filters.is_active %}
+  <div class="filter-chips">
+    {% if filters.from %}<span class="filter-chip">From: {{ filters.from }}</span>{% endif %}
+    {% if filters.to %}<span class="filter-chip">To: {{ filters.to }}</span>{% endif %}
+    {% if filters.completed_only %}<span class="filter-chip">Completed only</span>{% endif %}
+    {% if filters.respondent_id %}<span class="filter-chip">Single respondent</span>{% endif %}
+    {% if filters.group_by_qid %}<span class="filter-chip">Cross-tab active</span>{% endif %}
+    <span class="filter-chip" style="background:#fef3c7;color:#854d0e;border-color:#fde68a;">{{ total_responses }} match{{ total_responses|pluralize:"es" }}</span>
+  </div>
+  {% endif %}
+</form>
+{% endif %}
 
 {% if total_responses == 0 %}
 <div class="card">
@@ -164,6 +269,23 @@
 </div>
 {% endif %}
 
+{% if crosstab_block %}
+<div class="section-header"><i class="bi bi-grid-3x3-gap"></i>Cross-tab: by "{{ crosstab_block.group_by_text|truncatechars:60 }}"</div>
+<div class="chart-card">
+  <div class="chart-sub" style="margin-bottom:.75rem;">
+    Each question's answers split by the selected grouping variable.
+    Groups: {% for g in crosstab_block.group_labels %}<strong>{{ g }}</strong>{% if not forloop.last %}, {% endif %}{% endfor %}
+  </div>
+  {% for pivot in crosstab_block.pivots %}
+  <div class="crosstab-pivot">
+    <div class="pivot-title">{{ pivot.text }}</div>
+    <div class="pivot-meta">{{ pivot.type_label }}</div>
+    <div id="crosstab_{{ pivot.id }}"></div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 <!-- Per-question analytics -->
 <div class="section-header"><i class="bi bi-list-check"></i>Per-question analysis</div>
 
@@ -204,6 +326,10 @@
     <div class="scale-summary">
       <div class="stat"><div class="lbl">Mean</div><div class="val">{{ q.mean }}</div></div>
       <div class="stat"><div class="lbl">Median</div><div class="val">{{ q.median }}</div></div>
+      <div class="stat"><div class="lbl">Std dev</div><div class="val">{{ q.stdev }}</div></div>
+      <div class="stat"><div class="lbl">P25</div><div class="val">{{ q.p25 }}</div></div>
+      <div class="stat"><div class="lbl">P75</div><div class="val">{{ q.p75 }}</div></div>
+      <div class="stat"><div class="lbl">P90</div><div class="val">{{ q.p90 }}</div></div>
       <div class="stat"><div class="lbl">Min</div><div class="val">{{ q.min }}</div></div>
       <div class="stat"><div class="lbl">Max</div><div class="val">{{ q.max }}</div></div>
     </div>
@@ -213,6 +339,9 @@
       <span class="stat"><i class="bi bi-people"></i><span class="num">{{ q.count }}</span>values</span>
       <span class="stat">Mean <span class="num">{{ q.mean }}</span></span>
       <span class="stat">Median <span class="num">{{ q.median }}</span></span>
+      <span class="stat">σ <span class="num">{{ q.stdev }}</span></span>
+      <span class="stat">P25 <span class="num">{{ q.p25 }}</span></span>
+      <span class="stat">P75 <span class="num">{{ q.p75 }}</span></span>
       <span class="stat">Range <span class="num">{{ q.min }}–{{ q.max }}</span></span>
     </div>
     <div id="chart_{{ q.id }}"></div>
@@ -229,17 +358,35 @@
     <div class="q-stats">
       <span class="stat"><i class="bi bi-chat-quote"></i><span class="num">{{ q.count }}</span>text response{{ q.count|pluralize }}</span>
       <span class="stat">Avg length <span class="num">{{ q.avg_length }}</span> chars</span>
+      {% if q.sentiment_summary %}
+      <span class="stat">Avg sentiment <span class="num">{{ q.sentiment_summary.avg_score }}</span></span>
+      {% endif %}
     </div>
+    {% if q.sentiment_summary %}
+    <div class="sent-chips">
+      <span class="sent-chip pos"><i class="bi bi-emoji-smile me-1"></i>Positive: {{ q.sentiment_summary.positive }}</span>
+      <span class="sent-chip neu"><i class="bi bi-emoji-neutral me-1"></i>Neutral: {{ q.sentiment_summary.neutral }}</span>
+      <span class="sent-chip neg"><i class="bi bi-emoji-frown me-1"></i>Negative: {{ q.sentiment_summary.negative }}</span>
+    </div>
+    {% endif %}
     <div class="row g-3">
       {% if q.word_chart %}
-      <div class="col-md-5">
+      <div class="col-md-4">
         <div style="font-size:0.74rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.03em;margin-bottom:.4rem;">
           <i class="bi bi-tag me-1"></i>Most-used words
         </div>
         <div id="chart_{{ q.id }}"></div>
       </div>
       {% endif %}
-      <div class="{% if q.word_chart %}col-md-7{% else %}col-12{% endif %}">
+      {% if q.phrase_chart %}
+      <div class="col-md-4">
+        <div style="font-size:0.74rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.03em;margin-bottom:.4rem;">
+          <i class="bi bi-chat-square-text me-1"></i>Top phrases
+        </div>
+        <div id="phrase_{{ q.id }}"></div>
+      </div>
+      {% endif %}
+      <div class="col-md-{% if q.word_chart and q.phrase_chart %}4{% elif q.word_chart or q.phrase_chart %}8{% else %}12{% endif %}">
         <div style="font-size:0.74rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.03em;margin-bottom:.4rem;">
           <i class="bi bi-quote me-1"></i>Sample answers ({{ q.samples|length }})
         </div>
@@ -260,6 +407,36 @@
     </div>
     <div style="font-size:0.78rem;color:#64748b;padding:.5rem 0;">
       <i class="bi bi-info-circle me-1"></i>See the map at the top of this page for all geographic responses.
+    </div>
+
+  {% elif q.render == 'matrix' %}
+    <div class="q-stats">
+      <span class="stat"><i class="bi bi-grid"></i><span class="num">{{ q.rows_count }}</span>rows × <span class="num">{{ q.cols_count }}</span>cols</span>
+      <span class="stat"><i class="bi bi-people"></i><span class="num">{{ q.responded }}</span>responses</span>
+      <span class="stat"><i class="bi bi-check2-circle"></i><span class="num">{{ q.total_picks }}</span>cells filled</span>
+    </div>
+    <div id="chart_{{ q.id }}"></div>
+    <div class="matrix-summary">
+      <table>
+        <thead>
+          <tr>
+            <th>Row</th>
+            <th>Top pick</th>
+            <th class="num" style="text-align:right;">Top %</th>
+            <th class="num" style="text-align:right;">N</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in q.row_summary %}
+          <tr>
+            <td><strong>{{ row.row|truncatechars:60 }}</strong></td>
+            <td>{% if row.top_col %}{{ row.top_col|truncatechars:40 }}{% else %}<span style="color:#cbd5e1;">—</span>{% endif %}</td>
+            <td class="num">{% if row.count %}{{ row.top_pct }}%{% else %}—{% endif %}</td>
+            <td class="num">{{ row.count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
 
   {% elif q.render == 'simple_count' %}
@@ -336,9 +513,15 @@
 {% block extra_js %}
 {% if total_responses > 0 %}
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+{% if has_geo %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+{% endif %}
 <script id="timelineData" type="application/json">{{ timeline_chart_json|safe }}</script>
 <script id="qtypeData" type="application/json">{{ qtype_chart_json|safe }}</script>
 <script id="questionData" type="application/json">{{ question_blocks_json|safe }}</script>
+<script id="crosstabData" type="application/json">{{ crosstab_block_json|safe }}</script>
 {% if has_geo %}
 <script id="mapData" type="application/json">{{ map_block_json|safe }}</script>
 {% endif %}
@@ -374,28 +557,69 @@
   let blocks = [];
   try { blocks = JSON.parse(document.getElementById('questionData').textContent); } catch (e) {}
   blocks.forEach(b => {
-    const targetId = 'chart_' + b.id;
-    const el = document.getElementById(targetId);
-    if (!el) return;
-    let chart = null;
-    if (b.render === 'text') chart = b.word_chart;
-    else                     chart = b.chart;
-    if (!chart) return;
-    Plotly.newPlot(el, chart.data, chart.layout || {}, config);
+    // Primary chart
+    const mainEl = document.getElementById('chart_' + b.id);
+    if (mainEl) {
+      let chart = (b.render === 'text') ? b.word_chart : b.chart;
+      if (chart) Plotly.newPlot(mainEl, chart.data, chart.layout || {}, config);
+    }
+    // Bonus phrase chart for text questions
+    if (b.render === 'text' && b.phrase_chart) {
+      const phraseEl = document.getElementById('phrase_' + b.id);
+      if (phraseEl) Plotly.newPlot(phraseEl, b.phrase_chart.data,
+                                   b.phrase_chart.layout || {}, config);
+    }
   });
 
-  // Map
-  const mapEl = document.getElementById('responseMap');
-  const mapDataEl = document.getElementById('mapData');
-  if (mapEl && mapDataEl) {
-    let payload = null;
-    try { payload = JSON.parse(mapDataEl.textContent); } catch (e) {}
-    if (payload) Plotly.newPlot(mapEl, payload.data, payload.layout || {}, config);
+  // Cross-tab pivots
+  let crosstab = null;
+  try { crosstab = JSON.parse(document.getElementById('crosstabData').textContent); } catch (e) {}
+  if (crosstab && crosstab.pivots) {
+    crosstab.pivots.forEach(p => {
+      const el = document.getElementById('crosstab_' + p.id);
+      if (el && p.chart) {
+        Plotly.newPlot(el, p.chart.data, p.chart.layout || {}, config);
+      }
+    });
   }
 
-  // Re-render on tab visibility (Plotly sometimes mis-sizes when hidden)
+  // Map (Leaflet — Plotly's mapbox tiles get blocked by OSM)
+  const mapEl = document.getElementById('responseMap');
+  const mapDataEl = document.getElementById('mapData');
+  if (mapEl && mapDataEl && window.L) {
+    let payload = null;
+    try { payload = JSON.parse(mapDataEl.textContent); } catch (e) {}
+    if (payload && payload.markers && payload.markers.length) {
+      const map = L.map(mapEl, { scrollWheelZoom: false })
+                   .setView([payload.center.lat, payload.center.lng], payload.zoom);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        subdomains: 'abcd',
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      }).addTo(map);
+      const bounds = [];
+      payload.markers.forEach(m => {
+        const marker = L.circleMarker([m.lat, m.lng], {
+          radius: 7, color: '#0077c8', fillColor: '#0077c8',
+          fillOpacity: 0.85, weight: 2
+        }).addTo(map);
+        const popup = `<strong>${m.label}</strong><br>` +
+                      `${m.lat.toFixed(4)}, ${m.lng.toFixed(4)}` +
+                      (m.question ? `<br><em>${m.question}</em>` : '');
+        marker.bindPopup(popup);
+        bounds.push([m.lat, m.lng]);
+      });
+      if (bounds.length > 1) {
+        map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+      }
+      setTimeout(() => map.invalidateSize(), 100);
+      window.addEventListener('resize', () => map.invalidateSize());
+    }
+  }
+
+  // Re-render Plotly charts on resize (map handles its own resize above)
   window.addEventListener('resize', () => {
-    document.querySelectorAll('[id^="chart_"], #timelineChart, #qtypeChart, #responseMap')
+    document.querySelectorAll('[id^="chart_"], [id^="phrase_"], [id^="crosstab_"], #timelineChart, #qtypeChart')
             .forEach(el => Plotly.Plots.resize(el));
   });
 })();

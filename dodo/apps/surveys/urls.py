@@ -14,4 +14,5 @@ urlpatterns = [
     path('<int:pk>/questions/add/', views.AddQuestionView.as_view(), name='add_question'),
     path('<int:pk>/questions/reorder/', views.ReorderQuestionsView.as_view(), name='reorder_questions'),
     path('questions/<int:pk>/delete/', views.DeleteQuestionView.as_view(), name='delete_question'),
+    path('<int:pk>/export/', views.SurveyExportView.as_view(), name='export'),
 ]
